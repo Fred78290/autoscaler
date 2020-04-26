@@ -71,7 +71,7 @@ func TestTargetSize(t *testing.T) {
 		targetSize, err := ng.TargetSize()
 
 		assert.NoError(t, err)
-		assert.Equal(t, targetSize, testMaxNodeSize)
+		assert.Equal(t, targetSize, testMinNodeSize)
 	}
 }
 

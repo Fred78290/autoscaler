@@ -27,8 +27,12 @@ type grpcServer struct {
 	wg              sync.WaitGroup
 }
 
-var testGrpcServer = &grpcServer{}
 var testServer *grpc.Server
+var testGrpcServer = &grpcServer{
+	nodeGroupID: "ca-grpc-multipass",
+	minNodeSize: 0,
+	maxNodeSize: 5,
+}
 
 func providerID(groupID string) string {
 	return fmt.Sprintf("%s://%s/object?type=group", testProviderID, groupID)
@@ -128,7 +132,7 @@ func (s *grpcServer) Pricing(ctx context.Context, request *CloudProviderServiceR
 	return &PricingModelReply{
 		Response: &PricingModelReply_PriceModel{
 			PriceModel: &PricingModel{
-				Id: testGroupID,
+				Id: testProviderID,
 			},
 		},
 	}, nil
@@ -404,7 +408,8 @@ func (s *grpcServer) Exist(ctx context.Context, request *NodeGroupServiceRequest
 	}
 
 	return &ExistReply{
-		Exists: request.NodeGroupID == providerIDForNode(testGroupID, testNodeName),
+		//Exists: request.NodeGroupID == providerIDForNode(testGroupID, testNodeName),
+		Exists: request.NodeGroupID == testGroupID,
 	}, nil
 }
 
@@ -536,7 +541,7 @@ func stopTestServer() {
 func startTestServer(wg *sync.WaitGroup) {
 	log.Printf("Start listening test server")
 
-	lis, err := net.Listen("unix", "/var/run/cluster-autoscaler/grpc.sock")
+	lis, err := net.Listen("unix", "/tmp/cluster-autoscaler-grpc.sock")
 
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

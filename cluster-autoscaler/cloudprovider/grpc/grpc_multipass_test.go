@@ -9,7 +9,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 )
 
-func TestMultipassClusterScaling(t *testing.T) {
+func ignoreTestMultipassClusterScaling(t *testing.T) {
 	provider := testProviderWithEmbed(t, 300, false)
 
 	defer provider.grpcCloudProvider.Cleanup()

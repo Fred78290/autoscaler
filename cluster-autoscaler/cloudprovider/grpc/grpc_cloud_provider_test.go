@@ -62,7 +62,7 @@ func testProviderWithEmbed(t *testing.T, timeout int, embedded bool) *testGrpcCl
 	manager := &GrpcManager{
 		resourceLimiter: resourceLimiter,
 		config: GrpcConfig{
-			Address:    "unix:/var/run/cluster-autoscaler/grpc.sock",
+			Address:    "unix:/tmp/cluster-autoscaler-grpc.sock",
 			Identifier: testProviderID,
 			Timeout:    timeout,
 		},
