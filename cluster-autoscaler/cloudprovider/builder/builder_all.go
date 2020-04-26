@@ -40,6 +40,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.BaiducloudProviderName,
 	cloudprovider.MagnumProviderName,
 	cloudprovider.DigitalOceanProviderName,
+	grpccloudprovider.ProviderName,
 }
 
 // DefaultCloudProvider is GCE.
@@ -63,6 +64,8 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return magnum.BuildMagnum(opts, do, rl)
 	case packet.ProviderName:
 		return packet.BuildPacket(opts, do, rl)
+	case grpccloudprovider.ProviderName:
+		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}
 	return nil
 }
