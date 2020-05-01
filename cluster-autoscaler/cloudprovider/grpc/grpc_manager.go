@@ -22,7 +22,6 @@ type GrpcManager struct {
 	sync.Mutex
 	resourceLimiter            *cloudprovider.ResourceLimiter
 	config                     GrpcConfig
-	autoDiscoveryConfig        []cloudprovider.ASGAutoDiscoveryConfig
 	autoscalingOptions         config.AutoscalingOptions
 	nodes                      []*NodeGroupDef
 	connection                 *grpc.ClientConn
@@ -176,17 +175,11 @@ func newGrpcManager(configReader io.Reader, opts config.AutoscalingOptions, disc
 		return nil, ErrMissingConfig
 	}
 
-	specs, err := discoveryOpts.ParseASGAutoDiscoverySpecs()
-	if err != nil {
-		return nil, err
-	}
-
 	manager := &GrpcManager{
-		resourceLimiter:     rl,
-		config:              cfg,
-		autoDiscoveryConfig: specs,
-		autoscalingOptions:  opts,
-		nodes:               nodeGroups,
+		resourceLimiter:    rl,
+		config:             cfg,
+		autoscalingOptions: opts,
+		nodes:              nodeGroups,
 	}
 
 	return manager, nil
