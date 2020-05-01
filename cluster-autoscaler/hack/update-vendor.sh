@@ -17,7 +17,7 @@ fi
 
 SCRIPT_NAME=$(basename "$0")
 K8S_FORK=${K8S_FORK:-"git@github.com:kubernetes/kubernetes.git"}
-K8S_REV="master"
+K8S_REV="release-1.18"
 BATCH_MODE="false"
 TARGET_MODULE=${TARGET_MODULE:-k8s.io/autoscaler/cluster-autoscaler}
 VERIFY_COMMAND=${VERIFY_COMMAND:-"go test -mod=vendor ./..."}
@@ -41,8 +41,11 @@ done
 export GO111MODULE=on
 
 set -o errexit
-WORK_DIR="${WORK_DIR:-$(mktemp -d /tmp/ca-update-vendor.XXXX)}"
+#WORK_DIR="${WORK_DIR:-$(mktemp -d /tmp/ca-update-vendor.XXXX)}"
+WORK_DIR="${WORK_DIR:-$HOME/Projects/ca-update-vendor-$K8S_REV}"
 echo "Operating in ${WORK_DIR}"
+
+mkdir -p $WORK_DIR
 
 if [ ! -d $WORK_DIR ]; then
   echo "Work dir ${WORK_DIR} does not exist"
@@ -109,9 +112,9 @@ set +o errexit
   REQUIRED_GO_VERSION=$(cat go.mod  |grep '^go ' |tr -s ' ' |cut -d ' '  -f 2)
   USED_GO_VERSION=$(go version |sed 's/.*go\([0-9]\+\.[0-9]\+\).*/\1/')
 
-  if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
-    err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
-  fi
+  #if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
+  #  err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
+  #fi
 
   # Fix module name and staging modules links
   sed -i "s#module k8s.io/kubernetes#module ${TARGET_MODULE}#" go.mod
@@ -180,6 +183,9 @@ set +o errexit
 
   echo "Running go mod vendor"
   go mod vendor
+
+  echo "Generate grpc stub"
+  ./cloudprovider/grpc/protoc_grpc.sh
 
   echo "Running ${VERIFY_COMMAND}"
   if ! ${VERIFY_COMMAND} >&${BASH_XTRACEFD} 2>&1; then
