@@ -16,10 +16,11 @@ if ! which jq > /dev/null; then
 fi
 
 SCRIPT_NAME=$(basename "$0")
-K8S_FORK="git@github.com:kubernetes/kubernetes.git"
-K8S_REV="master"
+K8S_FORK=${K8S_FORK:-"git@github.com:kubernetes/kubernetes.git"}
+K8S_REV="release-1.16"
 BATCH_MODE="false"
 TARGET_MODULE=${TARGET_MODULE:-k8s.io/autoscaler/cluster-autoscaler}
+VERIFY_COMMAND=${VERIFY_COMMAND:-"go test -mod=vendor ./..."}
 
 ARGS="$@"
 OPTS=`getopt -o f::r::d::v::b:: --long k8sfork::,k8srev::,workdir::,batch:: -n $SCRIPT_NAME -- "$@"`
@@ -40,8 +41,11 @@ done
 export GO111MODULE=on
 
 set -o errexit
-WORK_DIR="${WORK_DIR:-$(mktemp -d /tmp/ca-update-vendor.XXXX)}"
+#WORK_DIR="${WORK_DIR:-$(mktemp -d /tmp/ca-update-vendor.XXXX)}"
+WORK_DIR="${WORK_DIR:-$HOME/Projects/ca-update-vendor-$K8S_REV}"
 echo "Operating in ${WORK_DIR}"
+
+mkdir -p $WORK_DIR
 
 if [ ! -d $WORK_DIR ]; then
   echo "Work dir ${WORK_DIR} does not exist"
@@ -108,9 +112,9 @@ set +o errexit
   REQUIRED_GO_VERSION=$(cat go.mod  |grep '^go ' |tr -s ' ' |cut -d ' '  -f 2)
   USED_GO_VERSION=$(go version |sed 's/.*go\([0-9]\+\.[0-9]\+\).*/\1/')
 
-  if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
-    err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
-  fi
+  #if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
+  #  err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
+  #fi
 
   # Fix module name and staging modules links
   sed -i "s#module k8s.io/kubernetes#module ${TARGET_MODULE}#" go.mod
@@ -130,8 +134,9 @@ set +o errexit
     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1";
   }
 
+  GO_MOD_EXTRA_FILES="$(shopt -s nullglob;echo go.mod-extra*)"
   OLD_EXTRA_FOUND="false"
-  for go_mod_extra in go.mod-extra*; do
+  for go_mod_extra in ${GO_MOD_EXTRA_FILES}; do
     list_dependencies ${go_mod_extra} | while read extra_path extra_version; do
       list_dependencies go.mod | while read source_path source_version; do
         if [[ "${source_path}" == "${extra_path}" ]]; then
@@ -149,7 +154,7 @@ set +o errexit
 
   # Add dependencies from go.mod-extra to go.mod
   # Propagate require entries to both require and replace
-  for go_mod_extra in go.mod-extra*; do
+  for go_mod_extra in ${GO_MOD_EXTRA_FILES}; do
     go mod edit -json ${go_mod_extra} | jq -r '.Require[]? | "-require \(.Path)@\(.Version)"' | xargs -t -r go mod edit >&${BASH_XTRACEFD} 2>&1
     go mod edit -json ${go_mod_extra} | jq -r '.Require[]? | "-replace \(.Path)=\(.Path)@\(.Version)"' | xargs -t -r go mod edit >&${BASH_XTRACEFD} 2>&1
     # And add explicit replace entries
@@ -179,17 +184,20 @@ set +o errexit
   echo "Running go mod vendor"
   go mod vendor
 
-  echo "Running go test -mod=vendor ./..."
-  if ! go test -mod=vendor ./... >&${BASH_XTRACEFD} 2>&1; then
-    err_rerun "Test run failed"
+    echo "Generate grpc stub"
+  ./cloudprovider/grpc/protoc_grpc.sh
+
+  echo "Running ${VERIFY_COMMAND}"
+  if ! ${VERIFY_COMMAND} >&${BASH_XTRACEFD} 2>&1; then
+    err_rerun "Verify command failed"
   fi
 
   # Commit go.mod* and vendor
-  git restore --staged . >&${BASH_XTRACEFD} 2>&1
+  git reset . >&${BASH_XTRACEFD} 2>&1
   git add vendor go.mod go.sum >&${BASH_XTRACEFD} 2>&1
   if ! git diff --quiet --cached; then
     echo "Commiting vendor, go.mod and go.sum"
-    git ci -m "Updating vendor against ${K8S_FORK}:${K8S_REV} (${K8S_REV_PARSED})" >&${BASH_XTRACEFD} 2>&1
+    git commit -m "Updating vendor against ${K8S_FORK}:${K8S_REV} (${K8S_REV_PARSED})" >&${BASH_XTRACEFD} 2>&1
   else
     echo "No changes after vendor update; skipping commit"
   fi
