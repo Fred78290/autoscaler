@@ -132,7 +132,7 @@ type ScheduleAlgorithm interface {
 	Extenders() []algorithm.SchedulerExtender
 	// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
 	// for cluster autoscaler integration.
-	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
+	// TODO(ahg-g): remove this once CA migrates to creating a Framework instead of a full scheduler.
 	PredicateMetadataProducer() predicates.MetadataProducer
 	// Snapshot snapshots scheduler cache and node infos. This is needed
 	// for cluster autoscaler integration.
@@ -640,6 +640,11 @@ func (g *genericScheduler) podFitsOnNode(
 	var failedPredicates []predicates.PredicateFailureReason
 	var status *framework.Status
 
+	// In the case where a node delete event is received before all pods on the node are deleted, a NodeInfo may have
+	// a nil Node(). This should not be an issue in 1.18 and later, but we need to check it here. See https://github.com/kubernetes/kubernetes/issues/89006
+	if info.Node() == nil {
+		return false, []predicates.PredicateFailureReason{}, framework.NewStatus(framework.UnschedulableAndUnresolvable, "node being deleted"), nil
+	}
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
 	// nominated pods, we run them when those pods are added to meta and nodeInfo.
