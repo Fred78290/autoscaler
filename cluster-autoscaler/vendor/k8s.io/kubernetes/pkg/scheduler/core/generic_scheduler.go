@@ -132,7 +132,7 @@ type ScheduleAlgorithm interface {
 	Extenders() []algorithm.SchedulerExtender
 	// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
 	// for cluster autoscaler integration.
-	// TODO(ahg-g): remove this once CA migrates to creating a Framework instead of a full scheduler.
+	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
 	PredicateMetadataProducer() predicates.MetadataProducer
 	// Snapshot snapshots scheduler cache and node infos. This is needed
 	// for cluster autoscaler integration.

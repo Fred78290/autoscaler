@@ -100,6 +100,8 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
+
+	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
 )
 
 // GetLoadBalancer returns whether the specified load balancer and its components exist, and
@@ -405,7 +407,7 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 		return nil, nil
 	}
 	isInternal := requiresInternalLoadBalancer(service)
-	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
+	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	serviceName := getServiceName(service)
 	for _, ipConfiguration := range *lb.FrontendIPConfigurations {
 		if lbFrontendIPConfigName == *ipConfiguration.Name {
@@ -420,7 +422,7 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 				if pipID == nil {
 					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress ID is Nil", serviceName, *lb.Name)
 				}
-				pipName, err := getLastSegment(*pipID)
+				pipName, err := getLastSegment(*pipID, "/")
 				if err != nil {
 					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress Name from ID(%s)", serviceName, *lb.Name, *pipID)
 				}
@@ -695,7 +697,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	}
 	lbName := *lb.Name
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
-	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
+	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
 	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
@@ -1028,7 +1030,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		}
 
 		for _, protocol := range protocols {
-			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port, subnet(service))
+			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port)
 			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
 
 			transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(protocol)
@@ -1082,14 +1084,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
+					EnableFloatingIP:    to.BoolPtr(true),
 				},
-			}
-			// LB does not support floating IPs for IPV6 rules
-			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
-				expectedRule.EnableFloatingIP = to.BoolPtr(false)
-			} else {
-				expectedRule.EnableFloatingIP = to.BoolPtr(true)
 			}
 
 			if protocol == v1.ProtocolTCP {
@@ -1138,6 +1134,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if lbIP != nil {
 		destinationIPAddress = *lbIP
 	}
+
 	if destinationIPAddress == "" {
 		destinationIPAddress = "*"
 	}
@@ -1147,6 +1144,12 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	serviceTags := getServiceTags(service)
+	if len(serviceTags) != 0 {
+		if _, ok := sourceRanges[defaultLoadBalancerSourceRanges]; ok {
+			delete(sourceRanges, defaultLoadBalancerSourceRanges)
+		}
+	}
+
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
