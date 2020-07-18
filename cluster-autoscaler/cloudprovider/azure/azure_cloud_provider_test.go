@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -51,7 +52,7 @@ func newTestAzureManager(t *testing.T) *AzureManager {
 		},
 	}
 
-	scaleSetsClient.On("CreateOrUpdateSync", mock.Anything, mock.Anything, mock.Anything).Run(
+	scaleSetsClient.On("CreateOrUpdateAsync", mock.Anything, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			resourceGroupName := args.Get(0).(string)
 			vmssName := args.Get(1).(string)
@@ -79,12 +80,24 @@ func newTestAzureManager(t *testing.T) *AzureManager {
 			virtualMachinesClient: &VirtualMachinesClientMock{
 				FakeStore: make(map[string]map[string]compute.VirtualMachine),
 			},
-			virtualMachineScaleSetsClient:   scaleSetsClient,
-			virtualMachineScaleSetVMsClient: &VirtualMachineScaleSetVMsClientMock{},
+			virtualMachineScaleSetsClient: scaleSetsClient,
+			virtualMachineScaleSetVMsClient: &VirtualMachineScaleSetVMsClientMock{
+				FakeStore: map[string]map[string]compute.VirtualMachineScaleSetVM{
+					"test": {
+						"0": {
+							ID:         to.StringPtr(fakeVirtualMachineScaleSetVMID),
+							InstanceID: to.StringPtr("0"),
+							VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
+								VMID: to.StringPtr("123E4567-E89B-12D3-A456-426655440000"),
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
-	cache, error := newAsgCache(int64(defaultAsgCacheTTL))
+	cache, error := newAsgCache()
 	assert.NoError(t, error)
 
 	manager.asgCache = cache
