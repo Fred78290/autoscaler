@@ -72,8 +72,8 @@ func (client *VirtualMachineScaleSetsClientMock) CreateOrUpdate(ctx context.Cont
 	}, nil
 }
 
-// CreateOrUpdateSync creates or updates the VirtualMachineScaleSet and returns the future
-func (client *VirtualMachineScaleSetsClientMock) CreateOrUpdateSync(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (result compute.VirtualMachineScaleSetsCreateOrUpdateFuture, err error) {
+// CreateOrUpdateAsync creates or updates the VirtualMachineScaleSet and returns the future
+func (client *VirtualMachineScaleSetsClientMock) CreateOrUpdateAsync(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (result compute.VirtualMachineScaleSetsCreateOrUpdateFuture, err error) {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
 	args := client.Called(resourceGroupName, VMScaleSetName, parameters)
@@ -91,6 +91,21 @@ func (client *VirtualMachineScaleSetsClientMock) WaitForCreateOrUpdate(ctx conte
 func (client *VirtualMachineScaleSetsClientMock) DeleteInstances(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
 	args := client.Called(resourceGroupName, vmScaleSetName, vmInstanceIDs)
 	return nil, args.Error(1)
+}
+
+// DeleteInstancesAsync deletes a set of instances for specified VirtualMachineScaleSet and returns the future
+func (client *VirtualMachineScaleSetsClientMock) DeleteInstancesAsync(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (result compute.VirtualMachineScaleSetsDeleteInstancesFuture, err error) {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
+	args := client.Called(resourceGroupName, vmScaleSetName, vmInstanceIDs)
+	return compute.VirtualMachineScaleSetsDeleteInstancesFuture{}, args.Error(1)
+}
+
+// WaitForDeleteInstances returns a successful result
+func (client *VirtualMachineScaleSetsClientMock) WaitForDeleteInstances(ctx context.Context, future compute.VirtualMachineScaleSetsDeleteInstancesFuture) (resp *http.Response, err error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+	}, nil
 }
 
 // List gets a list of VirtualMachineScaleSets.
@@ -111,6 +126,8 @@ func (client *VirtualMachineScaleSetsClientMock) List(ctx context.Context, resou
 // VirtualMachineScaleSetVMsClientMock mocks for VirtualMachineScaleSetVMsClient.
 type VirtualMachineScaleSetVMsClientMock struct {
 	mock.Mock
+	mutex     sync.Mutex
+	FakeStore map[string]map[string]compute.VirtualMachineScaleSetVM
 }
 
 // Get gets a VirtualMachineScaleSetVM by VMScaleSetName and instanceID.
@@ -129,18 +146,14 @@ func (m *VirtualMachineScaleSetVMsClientMock) Get(ctx context.Context, resourceG
 
 // List gets a list of VirtualMachineScaleSetVMs.
 func (m *VirtualMachineScaleSetVMsClientMock) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []compute.VirtualMachineScaleSetVM, err error) {
-	ID := fakeVirtualMachineScaleSetVMID
-	instanceID := "0"
-	vmID := "123E4567-E89B-12D3-A456-426655440000"
-	properties := compute.VirtualMachineScaleSetVMProperties{
-		VMID: &vmID,
-	}
-	result = append(result, compute.VirtualMachineScaleSetVM{
-		ID:                                 &ID,
-		InstanceID:                         &instanceID,
-		VirtualMachineScaleSetVMProperties: &properties,
-	})
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
+	if _, ok := m.FakeStore[resourceGroupName]; ok {
+		for _, v := range m.FakeStore[resourceGroupName] {
+			result = append(result, v)
+		}
+	}
 	return result, nil
 }
 

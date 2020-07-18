@@ -115,46 +115,6 @@ set +o errexit
   K8S_REV_PARSED=$(git rev-parse ${K8S_REV})
   popd >/dev/null
 
-  echo "Patch vendor against ${K8S_FORK}:${K8S_REV}"
-
-  cat > /tmp/generic_scheduler.patch <<EOF
---- generic_scheduler.go	2020-05-01 17:23:56.298425675 +0200
-+++ generic_scheduler_new.go	2020-05-01 17:24:58.957616233 +0200
-@@ -134,6 +134,10 @@
- 	// for cluster autoscaler integration.
- 	// TODO(ahg-g): remove this once CA migrates to creating a Framework instead of a full scheduler.
- 	PredicateMetadataProducer() predicates.MetadataProducer
-+	// Snapshot snapshots scheduler cache and node infos. This is needed
-+	// for cluster autoscaler integration.
-+	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
-+	Snapshot() error
- }
- 
- // ScheduleResult represents the result of one pod scheduled. It will contain
-@@ -169,7 +173,7 @@
- 
- // snapshot snapshots scheduler cache and node infos for all fit and priority
- // functions.
--func (g *genericScheduler) snapshot() error {
-+func (g *genericScheduler) Snapshot() error {
- 	// Used for all fit and priority funcs.
- 	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
- }
-@@ -192,7 +196,7 @@
- 	}
- 	trace.Step("Basic checks done")
- 
--	if err := g.snapshot(); err != nil {
-+	if err := g.Snapshot(); err != nil {
- 		return result, err
- 	}
- 	trace.Step("Snapshoting scheduler cache and node infos done")
-EOF
-
-  pushd ${K8S_REPO}/pkg/scheduler/core >/dev/null
-  patch < /tmp/generic_scheduler.patch
-  popd >/dev/null
-
   function err_rerun() {
     touch ${EXPECTED_ERROR_MARKER}
     echo "$*"
