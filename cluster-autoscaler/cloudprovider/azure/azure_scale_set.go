@@ -464,19 +464,6 @@ func (scaleSet *ScaleSet) DeleteInstances(instances []*azureRef) error {
 	return nil
 }
 
-func (scaleSet *ScaleSet) waitForDeleteInstances(future *azure.Future, requiredIds *compute.VirtualMachineScaleSetVMInstanceRequiredIDs) {
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-	klog.V(3).Infof("Calling virtualMachineScaleSetsClient.WaitForAsyncOperationResult - DeleteInstances(%v)", requiredIds.InstanceIds)
-	httpResponse, err := scaleSet.manager.azClient.virtualMachineScaleSetsClient.WaitForAsyncOperationResult(ctx, future)
-	isSuccess, err := isSuccessHTTPResponse(httpResponse, err)
-	if isSuccess {
-		klog.V(3).Infof("virtualMachineScaleSetsClient.WaitForAsyncOperationResult - DeleteInstances(%v) success", requiredIds.InstanceIds)
-		return
-	}
-	klog.Errorf("virtualMachineScaleSetsClient.WaitForAsyncOperationResult - DeleteInstances for instances %v failed with error: %v", requiredIds.InstanceIds, err)
-}
-
 // DeleteNodes deletes the nodes from the group.
 func (scaleSet *ScaleSet) DeleteNodes(nodes []*apiv1.Node) error {
 	klog.V(8).Infof("Delete nodes requested: %q\n", nodes)
