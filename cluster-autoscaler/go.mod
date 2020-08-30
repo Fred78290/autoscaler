@@ -35,7 +35,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
-	k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud v0.0.0-20200807122419-e3434e51c314
+	k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/component-base v0.0.0
@@ -408,5 +408,7 @@ replace (
 replace github.com/digitalocean/godo => github.com/digitalocean/godo v1.27.0
 
 replace github.com/rancher/go-rancher => github.com/rancher/go-rancher v0.1.0
+
+replace k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud => ./cloudprovider/magnum/gophercloud
 
 replace k8s.io/kubernetes => /home/fboltz/Projects/ca-update-vendor-release-1.19/kubernetes
