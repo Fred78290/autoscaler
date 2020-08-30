@@ -25,7 +25,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -135,10 +134,6 @@ func (az *azDeploymentsClient) Delete(ctx context.Context, resourceGroupName, de
 	return future.Response(), err
 }
 
-type azAccountsClient struct {
-	client storage.AccountsClient
-}
-
 type azClient struct {
 	virtualMachineScaleSetsClient   vmssclient.Interface
 	virtualMachineScaleSetVMsClient vmssvmclient.Interface
@@ -216,30 +211,30 @@ func newAzClient(cfg *Config, env *azure.Environment) (*azClient, error) {
 	azClientConfig.UserAgent = getUserAgentExtension()
 
 	vmssClientConfig := azClientConfig.WithRateLimiter(cfg.VirtualMachineScaleSetRateLimit)
-	scaleSetsClient := vmssclient.New(vmssClientConfig)
+	scaleSetsClient := vmssclient.New(vmssClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created scale set client with authorizer: %v", scaleSetsClient)
 
 	vmssVMClientConfig := azClientConfig.WithRateLimiter(cfg.VirtualMachineScaleSetRateLimit)
-	scaleSetVMsClient := vmssvmclient.New(vmssVMClientConfig)
+	scaleSetVMsClient := vmssvmclient.New(vmssVMClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created scale set vm client with authorizer: %v", scaleSetVMsClient)
 
 	vmClientConfig := azClientConfig.WithRateLimiter(cfg.VirtualMachineRateLimit)
-	virtualMachinesClient := vmclient.New(vmClientConfig)
+	virtualMachinesClient := vmclient.New(vmClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created vm client with authorizer: %v", virtualMachinesClient)
 
 	deploymentsClient := newAzDeploymentsClient(cfg.SubscriptionID, env.ResourceManagerEndpoint, spt)
 	klog.V(5).Infof("Created deployments client with authorizer: %v", deploymentsClient)
 
 	interfaceClientConfig := azClientConfig.WithRateLimiter(cfg.InterfaceRateLimit)
-	interfacesClient := interfaceclient.New(interfaceClientConfig)
+	interfacesClient := interfaceclient.New(interfaceClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created interfaces client with authorizer: %v", interfacesClient)
 
 	accountClientConfig := azClientConfig.WithRateLimiter(cfg.StorageAccountRateLimit)
-	storageAccountsClient := storageaccountclient.New(accountClientConfig)
+	storageAccountsClient := storageaccountclient.New(accountClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created storage accounts client with authorizer: %v", storageAccountsClient)
 
 	diskClientConfig := azClientConfig.WithRateLimiter(cfg.DiskRateLimit)
-	disksClient := diskclient.New(diskClientConfig)
+	disksClient := diskclient.New(diskClientConfig, getUserAgentExtension())
 	klog.V(5).Infof("Created disks client with authorizer: %v", disksClient)
 
 	managedContainerServicesClient := containerservice.NewManagedClustersClient(cfg.SubscriptionID)

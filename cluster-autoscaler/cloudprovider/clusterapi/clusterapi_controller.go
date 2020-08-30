@@ -342,6 +342,7 @@ func newMachineController(
 		return nil, fmt.Errorf("failed to validate if resource %q is available for group %q: %v",
 			resourceNameMachineDeployment, fmt.Sprintf("%s/%s", CAPIGroup, CAPIVersion), err)
 	}
+	klog.Infof("Using version %q for API group %q", CAPIVersion, CAPIGroup)
 
 	if machineDeployment {
 		gvrMachineDeployment = &schema.GroupVersionResource{
@@ -360,6 +361,14 @@ func newMachineController(
 	}
 	machineSetInformer := informerFactory.ForResource(*gvrMachineSet)
 	machineSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{})
+
+	gvrMachine := &schema.GroupVersionResource{
+		Group:    CAPIGroup,
+		Version:  CAPIVersion,
+		Resource: resourceNameMachine,
+	}
+	machineInformer := informerFactory.ForResource(*gvrMachine)
+	machineInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{})
 
 	gvrMachine := &schema.GroupVersionResource{
 		Group:    CAPIGroup,
