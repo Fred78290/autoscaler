@@ -18,6 +18,7 @@ package simulator
 
 import (
 	"fmt"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	scheduler_listers "k8s.io/kubernetes/pkg/scheduler/listers"
@@ -78,6 +79,11 @@ func (lister *unsetNodeInfoLister) List() ([]*scheduler_nodeinfo.NodeInfo, error
 
 // HavePodsWithAffinityList always returns an error
 func (lister *unsetNodeInfoLister) HavePodsWithAffinityList() ([]*scheduler_nodeinfo.NodeInfo, error) {
+	return nil, fmt.Errorf("lister not set in delegate")
+}
+
+// HavePodsWithRequiredAntiAffinityList always returns an error
+func (lister *unsetNodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*scheduler_nodeinfo.NodeInfo, error) {
 	return nil, fmt.Errorf("lister not set in delegate")
 }
 

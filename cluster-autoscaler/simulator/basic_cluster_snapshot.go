@@ -55,6 +55,17 @@ func (data *internalBasicSnapshotData) listNodeInfosThatHavePodsWithAffinityList
 	return havePodsWithAffinityList, nil
 }
 
+func (data *internalBasicSnapshotData) listNodeInfosThatHavePodsWithRequiredAntiAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+	havePodsWithRequiredAntiAffinityList := make([]*schedulernodeinfo.NodeInfo, 0, len(data.nodeInfoMap))
+	for _, v := range data.nodeInfoMap {
+		if len(v.PodsWithRequiredAntiAffinity()) > 0 {
+			havePodsWithRequiredAntiAffinityList = append(havePodsWithRequiredAntiAffinityList, v)
+		}
+	}
+
+	return havePodsWithRequiredAntiAffinityList, nil
+}
+
 func (data *internalBasicSnapshotData) getNodeInfo(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
 	if v, ok := data.nodeInfoMap[nodeName]; ok {
 		return v, nil
@@ -268,6 +279,11 @@ func (snapshot *basicClusterSnapshotNodeLister) List() ([]*schedulernodeinfo.Nod
 // HavePodsWithAffinityList returns the list of nodes with at least one pods with inter-pod affinity
 func (snapshot *basicClusterSnapshotNodeLister) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
 	return (*BasicClusterSnapshot)(snapshot).getInternalData().listNodeInfosThatHavePodsWithAffinityList()
+}
+
+// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+func (snapshot *basicClusterSnapshotNodeLister) HavePodsWithRequiredAntiAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+	return (*BasicClusterSnapshot)(snapshot).getInternalData().listNodeInfosThatHavePodsWithRequiredAntiAffinityList()
 }
 
 // Returns the NodeInfo of the given node name.

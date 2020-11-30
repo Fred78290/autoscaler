@@ -55,9 +55,10 @@ type internalDeltaSnapshotData struct {
 	modifiedNodeInfoMap map[string]*schedulernodeinfo.NodeInfo
 	deletedNodeInfos    map[string]bool
 
-	nodeInfoList         []*schedulernodeinfo.NodeInfo
-	podList              []*apiv1.Pod
-	havePodsWithAffinity []*schedulernodeinfo.NodeInfo
+	nodeInfoList                     []*schedulernodeinfo.NodeInfo
+	podList                          []*apiv1.Pod
+	havePodsWithAffinity             []*schedulernodeinfo.NodeInfo
+	havePodsWithRequiredAntiAffinity []*schedulernodeinfo.NodeInfo
 }
 
 func newInternalDeltaSnapshotData() *internalDeltaSnapshotData {
@@ -358,6 +359,24 @@ func (snapshot *deltaSnapshotNodeLister) HavePodsWithAffinityList() ([]*schedule
 	}
 	data.havePodsWithAffinity = havePodsWithAffinityList
 	return data.havePodsWithAffinity, nil
+}
+
+// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+func (snapshot *deltaSnapshotNodeLister) HavePodsWithRequiredAntiAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+	data := snapshot.data
+	if data.havePodsWithRequiredAntiAffinity != nil {
+		return data.havePodsWithRequiredAntiAffinity, nil
+	}
+
+	nodeInfoList := snapshot.data.getNodeInfoList()
+	havePodsWithRequiredAntiAffinity := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoList))
+	for _, node := range nodeInfoList {
+		if len(node.PodsWithRequiredAntiAffinity()) > 0 {
+			havePodsWithRequiredAntiAffinity = append(havePodsWithRequiredAntiAffinity, node)
+		}
+	}
+	data.havePodsWithRequiredAntiAffinity = havePodsWithRequiredAntiAffinity
+	return data.havePodsWithRequiredAntiAffinity, nil
 }
 
 // Get returns node info by node name.
