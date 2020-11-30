@@ -174,6 +174,9 @@ type Config struct {
 	// LoadBalancerResourceGroup determines the specific resource group of the load balancer user want to use, working
 	// with LoadBalancerName
 	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
+
+	// VmssVirtualMachinesCacheTTLInSeconds sets the cache TTL for vmssVirtualMachines
+	VmssVirtualMachinesCacheTTLInSeconds int `json:"vmssVirtualMachinesCacheTTLInSeconds,omitempty" yaml:"vmssVirtualMachinesCacheTTLInSeconds,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
@@ -343,7 +346,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		// No credentials provided, useInstanceMetadata should be enabled for Kubelet.
 		// TODO(feiskyer): print different error message for Kubelet and controller-manager, as they're
 		// requiring different credential settings.
-		if !config.UseInstanceMetadata && az.Config.CloudConfigType == cloudConfigTypeFile {
+		if !config.UseInstanceMetadata && config.CloudConfigType == cloudConfigTypeFile {
 			return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 		}
 

@@ -42,12 +42,18 @@ const (
 	maxStorageAccounts                     = 100 // max # is 200 (250 with special request). this allows 100 for everything else including stand alone disks
 	maxDisksPerStorageAccounts             = 60
 	storageAccountUtilizationBeforeGrowing = 0.5
+	// Disk Caching is not supported for disks 4 TiB and larger
+	// https://docs.microsoft.com/en-us/azure/virtual-machines/premium-storage-performance#disk-caching
+	diskCachingLimit = 4096 // GiB
 
 	maxLUN               = 64 // max number of LUNs per VM
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
 	errDiskNotFound      = "is not found"
+	errStatusCode400     = "statuscode=400"
+	errInvalidParameter  = `code="invalidparameter"`
+	errTargetInstanceIds = `target="instanceids"`
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -133,9 +139,19 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			return -1, danglingErr
 		}
 
-		if disk.DiskProperties != nil && disk.DiskProperties.Encryption != nil &&
-			disk.DiskProperties.Encryption.DiskEncryptionSetID != nil {
-			diskEncryptionSetID = *disk.DiskProperties.Encryption.DiskEncryptionSetID
+		if disk.DiskProperties != nil {
+			if disk.DiskProperties.DiskSizeGB != nil && *disk.DiskProperties.DiskSizeGB >= diskCachingLimit && cachingMode != compute.CachingTypesNone {
+				// Disk Caching is not supported for disks 4 TiB and larger
+				// https://docs.microsoft.com/en-us/azure/virtual-machines/premium-storage-performance#disk-caching
+				cachingMode = compute.CachingTypesNone
+				klog.Warningf("size of disk(%s) is %dGB which is bigger than limit(%dGB), set cacheMode as None",
+					diskURI, *disk.DiskProperties.DiskSizeGB, diskCachingLimit)
+			}
+
+			if disk.DiskProperties.Encryption != nil &&
+				disk.DiskProperties.Encryption.DiskEncryptionSetID != nil {
+				diskEncryptionSetID = *disk.DiskProperties.Encryption.DiskEncryptionSetID
+			}
 		}
 	}
 
@@ -188,6 +204,11 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 	c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
+	if err != nil && isInstanceNotFoundError(err) {
+		// if host doesn't exist, no need to detach
+		klog.Warningf("azureDisk - got InstanceNotFoundError(%v), DetachDisk(%s) will assume disk is already detached", err, diskURI)
+		return nil
+	}
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
@@ -358,4 +379,9 @@ func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) 
 	}
 
 	return true, nil
+}
+
+func isInstanceNotFoundError(err error) bool {
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, errStatusCode400) && strings.Contains(errMsg, errInvalidParameter) && strings.Contains(errMsg, errTargetInstanceIds)
 }

@@ -670,6 +670,22 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 
+	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+		// setup containerLogManager for CRI container runtime
+		containerLogManager, err := logs.NewContainerLogManager(
+			klet.runtimeService,
+			kubeDeps.OSInterface,
+			kubeCfg.ContainerLogMaxSize,
+			int(kubeCfg.ContainerLogMaxFiles),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+		}
+		klet.containerLogManager = containerLogManager
+	} else {
+		klet.containerLogManager = logs.NewStubContainerLogManager()
+	}
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -691,6 +707,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		imageService,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		legacyLogProvider,
+		klet.containerLogManager,
 		klet.runtimeClassManager,
 	)
 	if err != nil {
@@ -747,21 +764,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	klet.imageManager = imageManager
-
-	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
-		// setup containerLogManager for CRI container runtime
-		containerLogManager, err := logs.NewContainerLogManager(
-			klet.runtimeService,
-			kubeCfg.ContainerLogMaxSize,
-			int(kubeCfg.ContainerLogMaxFiles),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
-		}
-		klet.containerLogManager = containerLogManager
-	} else {
-		klet.containerLogManager = logs.NewStubContainerLogManager()
-	}
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
@@ -2001,18 +2003,22 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 }
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
-// If the pod is terminated, dispatchWork
+// If the pod has completed termination, dispatchWork will perform no action.
 func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
-	if kl.podIsTerminated(pod) {
-		if pod.DeletionTimestamp != nil {
-			// If the pod is in a terminated state, there is no pod worker to
-			// handle the work item. Check if the DeletionTimestamp has been
-			// set, and force a status update to trigger a pod deletion request
-			// to the apiserver.
-			kl.statusManager.TerminatePod(pod)
-		}
+	// check whether we are ready to delete the pod from the API server (all status up to date)
+	containersTerminal, podWorkerTerminal := kl.podAndContainersAreTerminal(pod)
+	if pod.DeletionTimestamp != nil && containersTerminal {
+		klog.V(4).Infof("Pod %q has completed execution and should be deleted from the API server: %s", format.Pod(pod), syncType)
+		kl.statusManager.TerminatePod(pod)
 		return
 	}
+
+	// optimization: avoid invoking the pod worker if no further changes are possible to the pod definition
+	if podWorkerTerminal {
+		klog.V(4).Infof("Pod %q has completed, ignoring remaining sync work: %s", format.Pod(pod), syncType)
+		return
+	}
+
 	// Run the sync in an async worker.
 	kl.podWorkers.UpdatePod(&UpdatePodOptions{
 		Pod:        pod,
