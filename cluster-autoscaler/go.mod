@@ -4,7 +4,7 @@
 
 module k8s.io/autoscaler/cluster-autoscaler
 
-go 1.13
+go 1.12
 
 require (
 	cloud.google.com/go v0.38.0
@@ -36,7 +36,6 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v0.0.0
 	k8s.io/legacy-cloud-providers v0.0.0
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 )
 
 replace (
