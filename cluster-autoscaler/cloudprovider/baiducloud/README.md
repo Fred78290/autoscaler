@@ -2,7 +2,7 @@
 The cluster autoscaler on BaiduCloud scales worker nodes within any specified autoscaling group. It will run as a `Deployment` in your cluster. This README will go over some of the necessary steps required to get the cluster autoscaler up and running.
 
 ## Kubernetes Version
-Cluster autoscaler must run on v1.8.6 or greater.
+Cluster autoscaler must run on v1.8.9 or greater.
 
 ## Deployment Specification
 
