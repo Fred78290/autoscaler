@@ -46,10 +46,11 @@ K8S_FORK=${K8S_FORK:-"git@github.com:kubernetes/kubernetes.git"}
 K8S_REV="release-1.17"
 BATCH_MODE="false"
 TARGET_MODULE=${TARGET_MODULE:-k8s.io/autoscaler/cluster-autoscaler}
+OVERRIDE_GO_VERSION="false"
 VERIFY_COMMAND=${VERIFY_COMMAND:-"go test -mod=vendor ./..."}
 
 ARGS="$@"
-OPTS=`getopt -o f::r::d::v::b:: --long k8sfork::,k8srev::,workdir::,batch:: -n $SCRIPT_NAME -- "$@"`
+OPTS=`getopt -o f::r::d::v::b::o:: --long k8sfork::,k8srev::,workdir::,batch::,override-go-version:: -n $SCRIPT_NAME -- "$@"`
 if [ $? != 0 ] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
 eval set -- "$OPTS"
 while true; do
@@ -58,6 +59,7 @@ while true; do
     -r | --k8srev ) K8S_REV="$2"; shift; shift ;;
     -d | --workdir ) WORK_DIR="$2"; shift; shift ;;
     -b | --batch ) BATCH_MODE="true"; shift; shift ;;
+    -o | --override-go-version) OVERRIDE_GO_VERSION="true"; shift; shift ;;
     -v ) VERBOSE=1; shift; if [[ "$1" == "v" ]]; then VERBOSE=2; shift; fi; ;;
     -- ) shift; break ;;
     * ) break ;;
@@ -137,9 +139,14 @@ set +o errexit
   REQUIRED_GO_VERSION=$(cat go.mod  |grep '^go ' |tr -s ' ' |cut -d ' '  -f 2)
   USED_GO_VERSION=$(go version |sed 's/.*go\([0-9]\+\.[0-9]\+\).*/\1/')
 
-  #if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
-  #  err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
-  #fi
+
+  if [[ "${REQUIRED_GO_VERSION}" != "${USED_GO_VERSION}" ]];then
+    if [[ "${OVERRIDE_GO_VERSION}" == "false" ]]; then
+      err_rerun "Invalid go version ${USED_GO_VERSION}; required go version is ${REQUIRED_GO_VERSION}."
+    else
+      echo "Overriding go version found in go.mod file. Expected go version ${REQUIRED_GO_VERSION}, using ${USED_GO_VERSION}"
+    fi
+  fi
 
   # Fix module name and staging modules links
   sed -i "s#module k8s.io/kubernetes#module ${TARGET_MODULE}#" go.mod
