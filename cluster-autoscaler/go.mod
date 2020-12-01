@@ -27,16 +27,15 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	google.golang.org/api v0.15.1
 	google.golang.org/grpc v1.27.0
+	google.golang.org/protobuf v1.24.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
-	k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/component-base v0.0.0
@@ -178,7 +177,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.0
-	github.com/google/cadvisor => github.com/google/cadvisor v0.37.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.37.2
 	github.com/google/go-cmp => github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
@@ -330,10 +329,10 @@ replace (
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
 	golang.org/x/mod => golang.org/x/mod v0.3.0
-	golang.org/x/net => golang.org/x/net v0.0.0-20200707034311-ab3426394381
+	golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 	golang.org/x/text => golang.org/x/text v0.3.3
 	golang.org/x/time => golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20200616133436-c1934b75d054
@@ -409,7 +408,5 @@ replace (
 replace github.com/digitalocean/godo => github.com/digitalocean/godo v1.27.0
 
 replace github.com/rancher/go-rancher => github.com/rancher/go-rancher v0.1.0
-
-replace k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum/gophercloud => ./cloudprovider/magnum/gophercloud
 
 replace k8s.io/kubernetes => /home/fboltz/Projects/ca-update-vendor-release-1.19/kubernetes
