@@ -18,6 +18,7 @@ package simulator
 
 import (
 	"fmt"
+
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -59,6 +60,11 @@ func (lister *unsetNodeInfoLister) List() ([]*schedulerframework.NodeInfo, error
 
 // HavePodsWithAffinityList always returns an error
 func (lister *unsetNodeInfoLister) HavePodsWithAffinityList() ([]*schedulerframework.NodeInfo, error) {
+	return nil, fmt.Errorf("lister not set in delegate")
+}
+
+// HavePodsWithRequiredAntiAffinityList always returns an error
+func (lister *unsetNodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*schedulerframework.NodeInfo, error) {
 	return nil, fmt.Errorf("lister not set in delegate")
 }
 
