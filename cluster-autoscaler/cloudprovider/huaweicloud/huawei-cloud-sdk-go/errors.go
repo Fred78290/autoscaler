@@ -162,7 +162,7 @@ func (e UnifiedError) ErrorCode() string {
 	}
 
 	if i, ok := e.ErrCode.(int); ok {
-		return string(i)
+		return strconv.Itoa(i)
 	}
 
 	return ""
