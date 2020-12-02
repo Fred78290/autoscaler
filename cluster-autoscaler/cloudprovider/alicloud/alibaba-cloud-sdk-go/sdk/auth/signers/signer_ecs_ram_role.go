@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -124,7 +125,7 @@ func (signer *EcsRamRoleSigner) refreshApi(request *requests.CommonRequest) (res
 
 func (signer *EcsRamRoleSigner) refreshCredential(response *responses.CommonResponse) (err error) {
 	if response.GetHttpStatus() != http.StatusOK {
-		fmt.Printf("refresh Ecs sts token err, httpStatus: %d, message = %s\n", response.GetHttpStatus(), response.GetHttpContentString())
+		fmt.Println("refresh Ecs sts token err, httpStatus: " + strconv.Itoa(response.GetHttpStatus()) + ", message = " + response.GetHttpContentString())
 		return
 	}
 	var data interface{}

@@ -7,8 +7,10 @@ LDFLAGS?=-s
 ENVVAR=CGO_ENABLED=0 GO111MODULE=off
 GOOS?=linux
 GOARCH?=$(shell go env GOARCH)
-REGISTRY?=staging-k8s.gcr.io
+#REGISTRY?=staging-k8s.gcr.io
+REGISTRY?=registry.gitlab.com/frederic.boltz/k8s-autoscaler
 DOCKER_NETWORK?=default
+BASEIMAGE?=gcr.io/distroless/static:latest
 ifdef BUILD_TAGS
   TAGS_FLAG=--tags ${BUILD_TAGS}
   PROVIDER=-${BUILD_TAGS}
@@ -23,22 +25,22 @@ ifdef LDFLAGS
 else
   LDFLAGS_FLAG=
 endif
-ifdef DOCKER_RM
-  RM_FLAG=--rm
-else
+ifdef NO_DOCKER_RM
   RM_FLAG=
+else
+  RM_FLAG=--rm
 endif
 
 build: build-arch-$(GOARCH)
 
 build-arch-%: clean-arch-%
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build ${LDFLAGS_FLAG} ${TAGS_FLAG} ./...
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
 
 build-binary: build-binary-arch-$(GOARCH)
 
 build-binary-arch-%: clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
 
 test-unit: clean build
 	GO111MODULE=off go test --test.short -race ./... ${TAGS_FLAG}
@@ -67,10 +69,15 @@ push-image: push-image-arch-$(GOARCH)
 push-image-arch-%:
 	./push_image.sh ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}-$*
 
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
+
 push-manifest:
 	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG} \
 		$(addprefix $(REGISTRY)/cluster-autoscaler$(PROVIDER):$(TAG)-, $(ALL_ARCH))
 	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
+
+clean:
+	rm -f ./out/cluster-autoscaler*
 
 execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH)) push-manifest
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"
