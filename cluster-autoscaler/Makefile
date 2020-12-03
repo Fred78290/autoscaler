@@ -1,13 +1,15 @@
-all: build
+ALL_ARCH = amd64 arm64
+all: $(addprefix build-arch-,$(ALL_ARCH))
 
 TAG?=dev
 FLAGS=
 LDFLAGS?=-s
 ENVVAR=CGO_ENABLED=0 GO111MODULE=off
 GOOS?=linux
-GOARCH?=amd64
+GOARCH?=$(shell go env GOARCH)
 #REGISTRY?=staging-k8s.gcr.io
 REGISTRY?=registry.gitlab.com/frederic.boltz/k8s-autoscaler
+DOCKER_NETWORK?=default
 BASEIMAGE?=gcr.io/distroless/static:latest
 ifdef BUILD_TAGS
   TAGS_FLAG=--tags ${BUILD_TAGS}
@@ -23,62 +25,93 @@ ifdef LDFLAGS
 else
   LDFLAGS_FLAG=
 endif
-
-build: clean deps
-	$(ENVVAR) GOOS=$(GOOS) go build ./... ${TAGS_FLAG}
-	$(ENVVAR) GOOS=$(GOOS) go build -o ./out/cluster-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
-
-build-binary: clean deps
-	$(ENVVAR) GOOS=linux go build -o ./out/cluster-autoscaler-linux-$(GOARCH) ${TAGS_FLAG}
-	$(ENVVAR) GOOS=darwin go build -o ./out/cluster-autoscaler-darwin-$(GOARCH) ${TAGS_FLAG}
-
-test-unit: clean deps build
-	GO111MODULE=off go test --test.short -race ./... ${TAGS_FLAG}
-
-dev-release: build-binary execute-release
-	@echo "Release ${TAG}${FOR_PROVIDER} completed"
-
-make-image:
-ifdef BASEIMAGE
-	docker build --pull --build-arg BASEIMAGE=${BASEIMAGE} \
-	    -t ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG} .
+ifdef NO_DOCKER_RM
+  RM_FLAG=
 else
-	docker build --pull -t ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG} .
+  RM_FLAG=--rm
 endif
 
-push-image:
-	./push_image.sh ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
+build: build-arch-$(GOARCH)
 
-execute-release: make-image push-image
+build-arch-%: clean-arch-%
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build ${LDFLAGS_FLAG} ${TAGS_FLAG} ./...
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+
+build-binary: build-binary-arch-$(GOARCH)
+
+build-binary-arch-%: clean-arch-%
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+
+test-unit: clean build
+	GO111MODULE=off go test --test.short -race ./... ${TAGS_FLAG}
+
+dev-release: dev-release-arch-$(GOARCH)
+
+dev-release-arch-%: build-binary-arch-% make-image-arch-% push-image-arch-%
+	@echo "Release ${TAG}${FOR_PROVIDER}-$* completed"
+
+make-image: make-image-arch-$(GOARCH)
+
+make-image-arch-%:
+ifdef BASEIMAGE
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --platform linux/$* --pull --build-arg BASEIMAGE=${BASEIMAGE} \
+		-t ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}-$* \
+		-f Dockerfile.$* .
+else
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --platform linux/$* --pull \
+		-t ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}-$* \
+		-f Dockerfile.$* .
+endif
+	@echo "Image ${TAG}${FOR_PROVIDER}-$* completed"
+
+push-image: push-image-arch-$(GOARCH)
+
+push-image-arch-%:
+	./push_image.sh ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}-$*
+	#DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}-$*
+
+push-manifest:
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG} \
+		$(addprefix --amend $(REGISTRY)/cluster-autoscaler$(PROVIDER):$(TAG)-, $(ALL_ARCH))
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
 
 clean:
 	rm -f ./out/cluster-autoscaler*
+
+execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH)) push-manifest
+	@echo "Release ${TAG}${FOR_PROVIDER} completed"
+
+clean: clean-arch-$(GOARCH)
+
+clean-arch-%:
+	rm -f cluster-autoscaler-$*
 
 generate:
 	go generate ./cloudprovider/aws
 
 format:
 	test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -d {} + | tee /dev/stderr)" || \
-    test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -w {} + | tee /dev/stderr)"
+	test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -w {} + | tee /dev/stderr)"
 
 docker-builder:
-	docker build -t autoscaling-builder ../builder
+	docker build --network=${DOCKER_NETWORK} -t autoscaling-builder ../builder
 
-build-in-docker: clean docker-builder
-	docker run --rm -v `pwd`:/gopath/src/k8s.io/autoscaler/cluster-autoscaler/ autoscaling-builder:latest bash -c 'cd /gopath/src/k8s.io/autoscaler/cluster-autoscaler && BUILD_TAGS=${BUILD_TAGS} make build-binary'
+build-in-docker: build-in-docker-arch-$(GOARCH)
 
-release: build-in-docker execute-release
+build-in-docker-arch-%: clean-arch-% docker-builder
+	docker run ${RM_FLAG} -v `pwd`:/gopath/src/k8s.io/autoscaler/cluster-autoscaler/:Z autoscaling-builder:latest \
+		bash -c 'cd /gopath/src/k8s.io/autoscaler/cluster-autoscaler && BUILD_TAGS=${BUILD_TAGS} LDFLAGS="${LDFLAGS}" make build-binary-arch-$*'
+
+release: $(addprefix build-in-docker-arch-,$(ALL_ARCH)) execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
 
-container: clean build-in-docker make-image
-	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
+container: container-arch-$(GOARCH)
 
-container-push: build-in-docker make-image
-	docker push ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
-	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
+container-arch-%: build-in-docker-arch-% make-image-arch-%
+	@echo "Full in-docker image ${TAG}${FOR_PROVIDER}-$* completed"
 
 test-in-docker: clean docker-builder
-	docker run --rm -v `pwd`:/gopath/src/k8s.io/autoscaler/cluster-autoscaler/ autoscaling-builder:latest bash -c 'cd /gopath/src/k8s.io/autoscaler/cluster-autoscaler && godep go test -race ./... ${TAGS_FLAG}'
+	docker run ${RM_FLAG} -v `pwd`:/gopath/src/k8s.io/autoscaler/cluster-autoscaler/:Z autoscaling-builder:latest \
+		bash -c 'cd /gopath/src/k8s.io/autoscaler/cluster-autoscaler && GO111MODULE=off go test -race ./... ${TAGS_FLAG}'
 
-.PHONY: all deps build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate
-
+.PHONY: all build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate push-image push-manifest
