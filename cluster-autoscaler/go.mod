@@ -13,6 +13,7 @@ require (
 	github.com/digitalocean/godo v1.27.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/mock v1.4.4
+	github.com/golang/protobuf v1.4.3
 	github.com/jmespath/go-jmespath v0.4.0
 	github.com/json-iterator/go v1.1.10
 	github.com/pkg/errors v0.9.1
@@ -22,6 +23,7 @@ require (
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.20.0
+	google.golang.org/grpc v1.27.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.21.0-beta.0
