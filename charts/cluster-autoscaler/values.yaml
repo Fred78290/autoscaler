@@ -133,6 +133,7 @@ extraArgs:
   stderrthreshold: info
   v: 4
   # write-status-configmap: true
+  # status-config-map-name: cluster-autoscaler-status
   # leader-elect: true
   # skip-nodes-with-local-storage: true
   # expander: random
@@ -185,14 +186,14 @@ extraVolumes: []
 extraVolumeMounts: []
   # - name: ssl-certs
   #   mountPath: /etc/ssl/certs/ca-certificates.crt
-  #   readonly: true
+  #   readOnly: true
 
 # fullnameOverride -- String to fully override `cluster-autoscaler.fullname` template.
 fullnameOverride: ""
 
 image:
   # image.repository -- Image repository
-  repository: us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler
+  repository: k8s.gcr.io/autoscaling/cluster-autoscaler
   # image.tag -- Image tag
   tag: v1.20.0
   # image.pullPolicy -- Image pull policy
