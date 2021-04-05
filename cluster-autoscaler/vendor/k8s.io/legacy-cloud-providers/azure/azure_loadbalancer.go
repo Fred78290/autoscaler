@@ -317,7 +317,7 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 						return nil, err
 					}
 					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
-					if !strings.EqualFold(primaryVMSetName, vmSetName) {
+					if !strings.EqualFold(primaryVMSetName, vmSetName) && vmSetName != "" {
 						klog.V(2).Infof("cleanBackendpoolForPrimarySLB: found unwanted vmSet %s, decouple it from the LB", vmSetName)
 						// construct a backendPool that only contains the IP config of the node to be deleted
 						interfaceIPConfigToBeDeleted := network.InterfaceIPConfiguration{
@@ -1133,6 +1133,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 						if err != nil {
 							return nil, err
 						}
+						if nodeName == "" {
+							// VM may under deletion
+							continue
+						}
 						// If a node is not supposed to be included in the LB, it
 						// would not be in the `nodes` slice. We need to check the nodes that
 						// have been added to the LB's backendpool, find the unwanted ones and
@@ -1626,7 +1630,13 @@ func (az *Cloud) reconcileLoadBalancerRule(
 
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
+	highAvailabilityPortsEnabled := false
 	for _, port := range ports {
+		if highAvailabilityPortsEnabled {
+			// Since the port is always 0 when enabling HA, only one rule should be configured.
+			break
+		}
+
 		protocols := []v1.Protocol{port.Protocol}
 		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerMixedProtocols]; ok && v == "true" {
 			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set", lbName, ServiceAnnotationLoadBalancerMixedProtocols)
@@ -1725,6 +1735,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				expectedRule.FrontendPort = to.Int32Ptr(0)
 				expectedRule.BackendPort = to.Int32Ptr(0)
 				expectedRule.Protocol = network.TransportProtocolAll
+				highAvailabilityPortsEnabled = true
 			}
 
 			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
