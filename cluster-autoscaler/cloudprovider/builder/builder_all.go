@@ -85,6 +85,8 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return clusterapi.BuildClusterAPI(opts, do, rl)
 	case cloudprovider.IonoscloudProviderName:
 		return ionoscloud.BuildIonosCloud(opts, do, rl)
+	case grpccloudprovider.ProviderName:
+		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}
 	return nil
 }
