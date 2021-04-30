@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors. All rights reserved
+# Copyright 2019 Frederic Boltz Author. All rights reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
-FROM $BASEIMAGE
-LABEL maintainer="Marcin Wielgus <mwielgus@google.com>"
 
-COPY ./out/linux/amd64/cluster-autoscaler /cluster-autoscaler
+#ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
+FROM alpine AS builder
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+COPY out .
+RUN ls / ; mv /$TARGETPLATFORM/cluster-autoscaler /cluster-autoscaler
+
+FROM ubuntu:focal
+
+LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
+
+COPY --from=builder /cluster-autoscaler /cluster-autoscaler
+
 CMD ["/cluster-autoscaler"]

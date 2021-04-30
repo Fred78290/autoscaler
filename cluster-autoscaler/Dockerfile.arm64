@@ -15,5 +15,5 @@ ARG BASEIMAGE=gcr.io/distroless/static:latest-arm64
 FROM $BASEIMAGE
 LABEL maintainer="Marcin Wielgus <mwielgus@google.com>"
 
-COPY ./out/cluster-autoscaler-arm64 /cluster-autoscaler
+COPY ./out/linux/arm64/cluster-autoscaler /cluster-autoscaler
 CMD ["/cluster-autoscaler"]
