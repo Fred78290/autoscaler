@@ -1,5 +1,13 @@
 #!/bin/bash
 sudo rm -rf out
 
-make -e REGISTRY=fred78290 -e TAG=v1.21.0 container -e GOARCH=amd64
-make -e REGISTRY=fred78290 -e TAG=v1.21.0 container -e GOARCH=arm64
+VERSION=v1.21.0
+REGISTRY=fred78290
+
+make -e REGISTRY=$REGISTRY -e TAG=$VERSION -e DOCKER_RM=1 container
+
+mkdir -p out/linux/amd64 out/linux/arm64
+cp cluster-autoscaler-amd64 out/linux/amd64/cluster-autoscaler
+cp cluster-autoscaler-arm64 out/linux/arm64/cluster-autoscaler
+
+docker buildx build --pull --platform linux/amd64,linux/arm64 --push -t ${REGISTRY}/cluster-autoscaler:${VERSION} .
