@@ -1,11 +1,10 @@
 #!/bin/bash
 sudo rm -rf out
+
 VERSION=v1.20.5
-make -e REGISTRY=fred78290 -e TAG=$VERSION container -e GOARCH=amd64
-make -e REGISTRY=fred78290 -e TAG=$VERSION container -e GOARCH=arm64
+REGISTRY=fred78290
 
-docker push fred78290/cluster-autoscaler:$VERSION-amd64
-docker push fred78290/cluster-autoscaler:$VERSION-arm64
+make -e REGISTRY=$REGISTRY -e TAG=$VERSION -e DOCKER_RM=1 container -e GOARCH=amd64
+make -e REGISTRY=$REGISTRY -e TAG=$VERSION -e DOCKER_RM=1 container -e GOARCH=arm64
 
-docker manifest create fred78290/cluster-autoscaler:$VERSION --amend fred78290/cluster-autoscaler:$VERSION-amd64 --amend fred78290/cluster-autoscaler:$VERSION-arm64
-docker manifest push fred78290/cluster-autoscaler:$VERSION
+docker buildx build --pull --platform linux/amd64,linux/arm64 --push -t ${REGISTRY}/cluster-autoscaler:${VERSION} .

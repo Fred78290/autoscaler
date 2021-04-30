@@ -34,13 +34,12 @@ endif
 build: build-arch-$(GOARCH)
 
 build-arch-%: clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build ${LDFLAGS_FLAG} ${TAGS_FLAG} ./...
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/$(GOOS)/$*/cluster-autoscaler ${LDFLAGS_FLAG} ${TAGS_FLAG}
 
 build-binary: build-binary-arch-$(GOARCH)
 
 build-binary-arch-%: clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o ./out/$(GOOS)/$*/cluster-autoscaler ${LDFLAGS_FLAG} ${TAGS_FLAG}
 
 test-unit: clean build
 	GO111MODULE=off go test --test.short -race ./... ${TAGS_FLAG}
@@ -77,7 +76,7 @@ push-manifest:
 	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge ${REGISTRY}/cluster-autoscaler${PROVIDER}:${TAG}
 
 clean:
-	rm -f ./out/cluster-autoscaler*
+	rm -f ./out
 
 execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH)) push-manifest
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"
@@ -85,7 +84,7 @@ execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-imag
 clean: clean-arch-$(GOARCH)
 
 clean-arch-%:
-	rm -f cluster-autoscaler-$*
+	rm -f ./out/$(GOOS)/$*/cluster-autoscaler
 
 generate:
 	go generate ./cloudprovider/aws
