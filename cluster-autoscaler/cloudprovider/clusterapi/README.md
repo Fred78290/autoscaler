@@ -140,3 +140,9 @@ export AUTOSCALER_NS=kube-system
 export AUTOSCALER_IMAGE=us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v1.20.0
 envsubst < examples/deployment.yaml | kubectl apply -f-
 ```
+
+### A note on permissions
+The `cluster-autoscaler-management` role for accessing cluster api scalable resources is scoped to `ClusterRole`.
+This may not be ideal for all environments (eg. Multi tenant environments).
+In such cases, it is recommended to scope it to a `Role` mapped to a specific namespace.
+
