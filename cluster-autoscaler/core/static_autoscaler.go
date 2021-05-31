@@ -148,12 +148,15 @@ func NewStaticAutoscaler(
 
 	scaleDown := NewScaleDown(autoscalingContext, processors, clusterStateRegistry)
 
+	// Set the initial scale times to be less than the start time so as to
+	// not start in cooldown mode.
+	initialScaleTime := time.Now().Add(-time.Hour)
 	return &StaticAutoscaler{
 		AutoscalingContext:      autoscalingContext,
 		startTime:               time.Now(),
-		lastScaleUpTime:         time.Now(),
-		lastScaleDownDeleteTime: time.Now(),
-		lastScaleDownFailTime:   time.Now(),
+		lastScaleUpTime:         initialScaleTime,
+		lastScaleDownDeleteTime: initialScaleTime,
+		lastScaleDownFailTime:   initialScaleTime,
 		scaleDown:               scaleDown,
 		processors:              processors,
 		processorCallbacks:      processorCallbacks,
@@ -244,6 +247,11 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) errors.AutoscalerError
 	if a.actOnEmptyCluster(allNodes, readyNodes, currentTime) {
 		return nil
 	}
+
+	// Update cluster resource usage metrics
+	coresTotal, memoryTotal := calculateCoresMemoryTotal(allNodes, currentTime)
+	metrics.UpdateClusterCPUCurrentCores(coresTotal)
+	metrics.UpdateClusterMemoryCurrentBytes(memoryTotal)
 
 	daemonsets, err := a.ListerRegistry.DaemonSetLister().List(labels.Everything())
 	if err != nil {
@@ -794,8 +802,26 @@ func getUpcomingNodeInfos(registry *clusterstate.ClusterStateRegistry, nodeInfos
 			// Ensure new nodes have different names because nodeName
 			// will be used as a map key. Also deep copy pods (daemonsets &
 			// any pods added by cloud provider on template).
-			upcomingNodes = append(upcomingNodes, scheduler_utils.DeepCopyTemplateNode(nodeTemplate, i))
+			upcomingNodes = append(upcomingNodes, scheduler_utils.DeepCopyTemplateNode(nodeTemplate, fmt.Sprintf("upcoming-%d", i)))
 		}
 	}
 	return upcomingNodes
+}
+
+func calculateCoresMemoryTotal(nodes []*apiv1.Node, timestamp time.Time) (int64, int64) {
+	// this function is essentially similar to the calculateScaleDownCoresMemoryTotal
+	// we want to check all nodes, aside from those deleting, to sum the cluster resource usage.
+	var coresTotal, memoryTotal int64
+	for _, node := range nodes {
+		if isNodeBeingDeleted(node, timestamp) {
+			// Nodes being deleted do not count towards total cluster resources
+			continue
+		}
+		cores, memory := core_utils.GetNodeCoresAndMemory(node)
+
+		coresTotal += cores
+		memoryTotal += memory
+	}
+
+	return coresTotal, memoryTotal
 }
