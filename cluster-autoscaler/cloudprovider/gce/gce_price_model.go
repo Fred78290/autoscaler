@@ -160,6 +160,8 @@ var (
 		"n2-highcpu-48":    1.7207,
 		"n2-highcpu-64":    2.2943,
 		"n2-highcpu-80":    2.8678,
+		"n2-highcpu-96":    3.4414,
+		"n2-highcpu-128":   4.5886,
 		"n2-highmem-2":     0.1310,
 		"n2-highmem-4":     0.2620,
 		"n2-highmem-8":     0.5241,
@@ -168,6 +170,8 @@ var (
 		"n2-highmem-48":    3.1443,
 		"n2-highmem-64":    4.1924,
 		"n2-highmem-80":    5.2406,
+		"n2-highmem-96":    6.2886,
+		"n2-highmem-128":   8.3848,
 		"n2-standard-2":    0.0971,
 		"n2-standard-4":    0.1942,
 		"n2-standard-8":    0.3885,
@@ -176,6 +180,8 @@ var (
 		"n2-standard-48":   2.3308,
 		"n2-standard-64":   3.1078,
 		"n2-standard-80":   3.8847,
+		"n2-standard-96":   4.6616,
+		"n2-standard-128":  6.2156,
 		"n2d-highcpu-2":    0.0624,
 		"n2d-highcpu-4":    0.1248,
 		"n2d-highcpu-8":    0.2495,
@@ -272,6 +278,8 @@ var (
 		"n2-highcpu-48":    0.4164,
 		"n2-highcpu-64":    0.5552,
 		"n2-highcpu-80":    0.6940,
+		"n2-highcpu-96":    0.8328,
+		"n2-highcpu-128":   1.1104,
 		"n2-highmem-2":     0.0317,
 		"n2-highmem-4":     0.0634,
 		"n2-highmem-8":     0.1268,
@@ -280,6 +288,8 @@ var (
 		"n2-highmem-48":    0.7609,
 		"n2-highmem-64":    1.0145,
 		"n2-highmem-80":    1.2681,
+		"n2-highmem-96":    1.5218,
+		"n2-highmem-128":   2.029,
 		"n2-standard-2":    0.0235,
 		"n2-standard-4":    0.0470,
 		"n2-standard-8":    0.0940,
@@ -288,6 +298,8 @@ var (
 		"n2-standard-48":   0.5640,
 		"n2-standard-64":   0.7520,
 		"n2-standard-80":   0.9400,
+		"n2-standard-96":   1.128,
+		"n2-standard-128":  1.504,
 		"n2d-highcpu-2":    0.0151,
 		"n2d-highcpu-4":    0.0302,
 		"n2d-highcpu-8":    0.0604,
@@ -348,7 +360,7 @@ func (model *GcePriceModel) NodePrice(node *apiv1.Node, startTime time.Time, end
 	// Base instance price
 	if node.Labels != nil {
 		isPreemptible = node.Labels[preemptibleLabel] == "true"
-		if machineType, found := node.Labels[apiv1.LabelInstanceType]; found {
+		if machineType, found := getInstanceTypeFromLabels(node.Labels); found {
 			priceMapToUse := instancePrices
 			if isPreemptible {
 				priceMapToUse = preemptiblePrices
@@ -362,8 +374,10 @@ func (model *GcePriceModel) NodePrice(node *apiv1.Node, startTime time.Time, end
 		}
 	}
 	if !basePriceFound {
-		price = getBasePrice(node.Status.Capacity, node.Labels[apiv1.LabelInstanceType], startTime, endTime)
-		price = price * getPreemptibleDiscount(node)
+		if machineType, found := getInstanceTypeFromLabels(node.Labels); found {
+			price = getBasePrice(node.Status.Capacity, machineType, startTime, endTime)
+			price = price * getPreemptibleDiscount(node)
+		}
 	}
 
 	// GPUs
@@ -407,7 +421,10 @@ func getPreemptibleDiscount(node *apiv1.Node) float64 {
 	if node.Labels[preemptibleLabel] != "true" {
 		return 1.0
 	}
-	instanceType := node.Labels[apiv1.LabelInstanceType]
+	instanceType, found := getInstanceTypeFromLabels(node.Labels)
+	if !found {
+		return 1.0
+	}
 	instanceFamily := getInstanceFamily(instanceType)
 
 	discountMap := predefinedPreemptibleDiscount
@@ -475,4 +492,12 @@ func getAdditionalPrice(resources apiv1.ResourceList, startTime time.Time, endTi
 	gpu := resources[gpu.ResourceNvidiaGPU]
 	price += float64(gpu.MilliValue()) / 1000.0 * gpuPricePerHour * hours
 	return price
+}
+
+func getInstanceTypeFromLabels(labels map[string]string) (string, bool) {
+	machineType, found := labels[apiv1.LabelInstanceTypeStable]
+	if !found {
+		machineType, found = labels[apiv1.LabelInstanceType]
+	}
+	return machineType, found
 }

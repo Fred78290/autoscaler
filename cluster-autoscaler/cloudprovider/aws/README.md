@@ -143,9 +143,10 @@ be labeled or tainted when they join the cluster, such as:
 
 * `k8s.io/cluster-autoscaler/node-template/label/foo`: `bar`
 * `k8s.io/cluster-autoscaler/node-template/taint/dedicated`: `NoSchedule`
+* `k8s.io/cluster-autoscaler/node-template/taint/tier:` `batch:NoSchedule`
 
 **NOTE:** It is your responsibility to ensure such labels and/or taints are
-applied via the node's kubelet configuration at startup.
+applied via the node's kubelet configuration at startup. Cluster Autoscaler will not set the node taints for you.
 
 Recommendations:
 
@@ -355,3 +356,6 @@ To refresh static list, please run `go run ec2_instance_types/gen.go` under
   `aws:///us-east-1a/i-01234abcdef`.
 * If you want to use regional STS endpoints (e.g. when using VPC endpoint for
   STS) the env `AWS_STS_REGIONAL_ENDPOINTS=regional` should be set.
+* If you want to run it on instances with IMDSv1 disabled make sure your
+  EC2 launch configuration has the setting `Metadata response hop limit` set to `2`.
+  Otherwise, the `/latest/api/token` call will timeout and result in an error. See [AWS docs here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html#configuring-instance-metadata-options) for further information. 
