@@ -31,6 +31,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/exoscale"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/hetzner"
+	grpccloudprovider "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/grpc"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/linode"
@@ -57,6 +58,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.ClusterAPIProviderName,
 	cloudprovider.IonoscloudProviderName,
 	cloudprovider.LinodeProviderName,
+	grpccloudprovider.ProviderName,
 	cloudprovider.BizflyCloudProviderName,
 }
 
@@ -99,6 +101,8 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return ionoscloud.BuildIonosCloud(opts, do, rl)
 	case cloudprovider.LinodeProviderName:
 		return linode.BuildLinode(opts, do, rl)
+	case grpccloudprovider.ProviderName:
+		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}
 	return nil
 }

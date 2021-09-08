@@ -13,6 +13,7 @@ require (
 	github.com/digitalocean/godo v1.27.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/mock v1.4.4
+	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	github.com/jmespath/go-jmespath v0.4.0
 	github.com/json-iterator/go v1.1.11
@@ -24,6 +25,8 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.20.0
+	google.golang.org/grpc v1.38.0
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.22.0
@@ -39,6 +42,8 @@ require (
 	k8s.io/legacy-cloud-providers v0.0.0
 	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 )
+
+replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
 
 replace github.com/digitalocean/godo => github.com/digitalocean/godo v1.27.0
 
