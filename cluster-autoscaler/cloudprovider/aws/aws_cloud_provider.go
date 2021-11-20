@@ -220,7 +220,10 @@ func (ng *AwsNodeGroup) Delete() error {
 // GetOptions returns NodeGroupAutoscalingOptions that should be used for this particular
 // NodeGroup. Returning a nil will result in using default options.
 func (ng *AwsNodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions) (*config.NodeGroupAutoscalingOptions, error) {
-	return nil, cloudprovider.ErrNotImplemented
+	if ng.asg == nil || ng.asg.Tags == nil || len(ng.asg.Tags) == 0 {
+		return &defaults, nil
+	}
+	return ng.awsManager.GetAsgOptions(*ng.asg, defaults), nil
 }
 
 // IncreaseSize increases Asg size
@@ -354,7 +357,7 @@ func BuildAWS(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscover
 	// Generate EC2 list
 	instanceTypes, lastUpdateTime := GetStaticEC2InstanceTypes()
 	if opts.AWSUseStaticInstanceList {
-		klog.Warningf("Use static EC2 Instance Types and list could be outdated. Last update time: %s", lastUpdateTime)
+		klog.Warningf("Using static EC2 Instance Types, this list could be outdated. Last update time: %s", lastUpdateTime)
 	} else {
 		region, err := GetCurrentAwsRegion()
 		if err != nil {
