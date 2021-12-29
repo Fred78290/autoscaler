@@ -17,11 +17,6 @@ import (
 	klog "k8s.io/klog/v2"
 )
 
-const (
-	// ProviderName is the cloud provider name for AWS
-	ProviderName = "grpc"
-)
-
 // ErrMissingConfig is returned if GRPC config is missing.
 var ErrMissingConfig = errors.NewAutoscalerError(errors.InternalError, "Missing GRPC config")
 

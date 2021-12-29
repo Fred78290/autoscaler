@@ -66,6 +66,8 @@ const (
 	LinodeProviderName = "linode"
 	// PacketProviderName gets the provider name of packet
 	PacketProviderName = "packet"
+	// GrpcProviderName gets the provider name of grpc
+	GrpcProviderName = "grpc"
 )
 
 // CloudProvider contains configuration info and functions for interacting with
