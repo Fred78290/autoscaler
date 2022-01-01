@@ -35,7 +35,7 @@ The syntax of **nodes** parameter is
 
 min nodes:max nodes:include existing nodes/node group name|node label;node label
 
-Node label could be omited.
+Node label could be omitted.
 
 And fill the node groups in container command by `--nodes`, e.g.
 
