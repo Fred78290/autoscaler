@@ -63,7 +63,7 @@ func (grpc *grpcCloudProvider) Cleanup() error {
 
 // Name returns name of the cloud provider.
 func (grpc *grpcCloudProvider) Name() string {
-	return ProviderName
+	return cloudprovider.GrpcProviderName
 }
 
 // NodeGroups returns all node groups configured for this cloud provider.

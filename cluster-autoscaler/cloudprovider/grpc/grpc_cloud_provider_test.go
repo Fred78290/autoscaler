@@ -108,7 +108,7 @@ func TestName(t *testing.T) {
 
 	assert.NoError(t, provider.Refresh())
 
-	assert.Equal(t, provider.Name(), ProviderName)
+	assert.Equal(t, provider.Name(), cloudprovider.GrpcProviderName)
 }
 
 func TestCleanup(t *testing.T) {
