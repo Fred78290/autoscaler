@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -52,18 +53,20 @@ const (
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
-		// When ILBSubsets is enabled, new ILB services will not be processed here.
-		// Services that have existing GCE resources created by this controller will continue to update.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer since %s feature is enabled.", AlphaFeatureILBSubsets)
-		return nil, cloudprovider.ImplementedElsewhere
-	}
-	if hasFinalizer(svc, ILBFinalizerV2) {
-		// Another controller is handling the resources for this service.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer as service contains '%s' finalizer.", ILBFinalizerV2)
-		return nil, cloudprovider.ImplementedElsewhere
+	if existingFwdRule == nil && !hasFinalizer(svc, ILBFinalizerV1) {
+		// Neither the forwarding rule nor the V1 finalizer exists. This is most likely a new service.
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+			// When ILBSubsets is enabled, new ILB services will not be processed here.
+			// Services that have existing GCE resources created by this controller or the v1 finalizer
+			// will continue to update.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, since %s feature is enabled.", svc.Namespace, svc.Name, AlphaFeatureILBSubsets)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
+		if hasFinalizer(svc, ILBFinalizerV2) {
+			// No V1 resources present - Another controller is handling the resources for this service.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, as service contains %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV2)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
 	}
 
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -199,8 +202,10 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
 		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
 		// rule would show the old protocol.
-		frDiff := cmp.Diff(existingFwdRule, newFwdRule)
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		if klog.V(2).Enabled() {
+			frDiff := cmp.Diff(existingFwdRule, newFwdRule)
+			klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		}
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
@@ -275,8 +280,7 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
 	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && !hasFinalizer(svc, ILBFinalizerV1) {
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingUpdateInternalLoadBalancer",
-			"Skipped updateInternalLoadBalancer as service does not contain '%s' finalizer.", ILBFinalizerV1)
+		klog.V(2).Infof("Skipped updateInternalLoadBalancer for service %s/%s since it does not contain %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV1)
 		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()

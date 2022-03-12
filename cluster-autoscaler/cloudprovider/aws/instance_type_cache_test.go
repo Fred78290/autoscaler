@@ -24,8 +24,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+	test_clock "k8s.io/utils/clock/testing"
 )
 
 func TestInstanceTypeCache(t *testing.T) {
@@ -64,7 +64,7 @@ func TestLTVersionChange(t *testing.T) {
 		})
 	}
 
-	fakeClock := clock.NewFakeClock(time.Unix(0, 0))
+	fakeClock := test_clock.NewFakeClock(time.Unix(0, 0))
 	fakeStore := cache.NewFakeExpirationStore(
 		func(obj interface{}) (s string, e error) {
 			return obj.(instanceTypeCachedObject).name, nil
@@ -79,9 +79,10 @@ func TestLTVersionChange(t *testing.T) {
 	m := newAsgInstanceTypeCacheWithClock(&awsWrapper{a, e, nil}, fakeClock, fakeStore)
 
 	for i := 0; i < 2; i++ {
-		err := m.populate([]*asg{
-			{
-				AwsRef: AwsRef{Name: asgName},
+		asgRef := AwsRef{Name: asgName}
+		err := m.populate(map[AwsRef]*asg{
+			asgRef: {
+				AwsRef: asgRef,
 				LaunchTemplate: &launchTemplate{
 					name:    ltName,
 					version: aws.StringValue(ltVersions[i]),

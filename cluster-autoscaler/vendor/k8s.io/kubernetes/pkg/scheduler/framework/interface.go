@@ -35,7 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -131,7 +131,7 @@ func NewPodsToActivate() *PodsToActivate {
 }
 
 // Status indicates the result of running a plugin. It consists of a code, a
-// message, (optionally) an error and an plugin name it fails by.
+// message, (optionally) an error, and a plugin name it fails by.
 // When the status code is not Success, the reasons should explain why.
 // And, when code is Success, all the other fields should be empty.
 // NOTE: A nil Status is also considered as Success.
@@ -608,16 +608,44 @@ type Handle interface {
 	Parallelizer() parallelize.Parallelizer
 }
 
+type NominatingMode int
+
+const (
+	ModeNoop NominatingMode = iota
+	ModeOverride
+)
+
+type NominatingInfo struct {
+	NominatedNodeName string
+	NominatingMode    NominatingMode
+}
+
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
 type PostFilterResult struct {
-	NominatedNodeName string
+	*NominatingInfo
+}
+
+func NewPostFilterResultWithNominatedNode(name string) *PostFilterResult {
+	return &PostFilterResult{
+		NominatingInfo: &NominatingInfo{
+			NominatedNodeName: name,
+			NominatingMode:    ModeOverride,
+		},
+	}
+}
+
+func (ni *NominatingInfo) Mode() NominatingMode {
+	if ni == nil {
+		return ModeNoop
+	}
+	return ni.NominatingMode
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
-	AddNominatedPod(pod *PodInfo, nodeName string)
+	AddNominatedPod(pod *PodInfo, nominatingInfo *NominatingInfo)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.

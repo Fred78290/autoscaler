@@ -273,7 +273,7 @@ func (m *AwsManager) Cleanup() {
 	m.asgCache.Cleanup()
 }
 
-func (m *AwsManager) getAsgs() []*asg {
+func (m *AwsManager) getAsgs() map[AwsRef]*asg {
 	return m.asgCache.Get()
 }
 
@@ -299,6 +299,11 @@ func (m *AwsManager) DeleteInstances(instances []*AwsInstanceRef) error {
 // GetAsgNodes returns Asg nodes.
 func (m *AwsManager) GetAsgNodes(ref AwsRef) ([]AwsInstanceRef, error) {
 	return m.asgCache.InstancesByAsg(ref)
+}
+
+// GetInstanceStatus returns the status of ASG nodes
+func (m *AwsManager) GetInstanceStatus(ref AwsInstanceRef) (*string, error) {
+	return m.asgCache.InstanceStatus(ref)
 }
 
 func (m *AwsManager) getAsgTemplate(asg *asg) (*asgTemplate, error) {
@@ -541,7 +546,7 @@ func parseASGAutoDiscoverySpecs(o cloudprovider.NodeGroupDiscoveryOptions) ([]as
 func parseASGAutoDiscoverySpec(spec string) (asgAutoDiscoveryConfig, error) {
 	cfg := asgAutoDiscoveryConfig{}
 
-	tokens := strings.Split(spec, ":")
+	tokens := strings.SplitN(spec, ":", 2)
 	if len(tokens) != 2 {
 		return cfg, fmt.Errorf("invalid node group auto discovery spec specified via --node-group-auto-discovery: %s", spec)
 	}

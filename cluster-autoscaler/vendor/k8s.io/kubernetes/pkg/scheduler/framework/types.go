@@ -215,6 +215,8 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
+	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	PostFilterMsg string
 }
 
 // FitError describes a fit error of a pod.
@@ -247,6 +249,10 @@ func (f *FitError) Error() string {
 		return reasonStrings
 	}
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += " " + postFilterMsg
+	}
 	return reasonMsg
 }
 
@@ -273,8 +279,8 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm
 	}
 
 	var terms []AffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i])
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
@@ -291,13 +297,13 @@ func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm)
 	}
 
 	var terms []WeightedAffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term.PodAffinityTerm)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
 		}
-		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
 	}
 	return terms, nil
 }

@@ -46,6 +46,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/metrics"
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroupset"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/nodeinfosprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
@@ -154,6 +155,9 @@ var (
 
 	expanderFlag = flag.String("expander", expander.RandomExpanderName, "Type of node group expander to be used in scale up. Available values: ["+strings.Join(expander.AvailableExpanders, ",")+"]. Specifying multiple values separated by commas will call the expanders in succession until there is only one option remaining. Ties still existing after this process are broken randomly.")
 
+	grpcExpanderCert = flag.String("grpc-expander-cert", "", "Path to cert used by gRPC server over TLS")
+	grpcExpanderURL  = flag.String("grpc-expander-url", "", "URL to reach gRPC expander server.")
+
 	ignoreDaemonSetsUtilization = flag.Bool("ignore-daemonsets-utilization", false,
 		"Should CA ignore DaemonSet pods when calculating resource utilization for scaling down")
 	ignoreMirrorPodsUtilization = flag.Bool("ignore-mirror-pods-utilization", false,
@@ -185,6 +189,7 @@ var (
 
 	emitPerNodeGroupMetrics  = flag.Bool("emit-per-nodegroup-metrics", false, "If true, emit per node group metrics.")
 	debuggingSnapshotEnabled = flag.Bool("debugging-snapshot-enabled", false, "Whether the debugging snapshot of cluster autoscaler feature is enabled")
+	nodeInfoCacheExpireTime  = flag.Duration("node-info-cache-expire-time", 87600*time.Hour, "Node Info cache expire time for each item. Default value is 10 years.")
 )
 
 func createAutoscalingOptions() config.AutoscalingOptions {
@@ -219,6 +224,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		ScaleUpFromZero:                    *scaleUpFromZero,
 		EstimatorName:                      *estimatorFlag,
 		ExpanderNames:                      *expanderFlag,
+		GRPCExpanderCert:                   *grpcExpanderCert,
+		GRPCExpanderURL:                    *grpcExpanderURL,
 		IgnoreDaemonSetsUtilization:        *ignoreDaemonSetsUtilization,
 		IgnoreMirrorPodsUtilization:        *ignoreMirrorPodsUtilization,
 		MaxBulkSoftTaintCount:              *maxBulkSoftTaintCount,
@@ -322,6 +329,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 	}
 
 	opts.Processors = ca_processors.DefaultProcessors()
+	opts.Processors.TemplateNodeInfoProvider = nodeinfosprovider.NewDefaultTemplateNodeInfoProvider(nodeInfoCacheExpireTime)
 	opts.Processors.PodListProcessor = core.NewFilterOutSchedulablePodListProcessor()
 
 	nodeInfoComparatorBuilder := nodegroupset.CreateGenericNodeInfoComparator
