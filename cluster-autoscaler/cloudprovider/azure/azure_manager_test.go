@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -697,6 +697,7 @@ func TestGetFilteredAutoscalingGroupsVmss(t *testing.T) {
 		maxSize:                maxVal,
 		manager:                manager,
 		curSize:                3,
+		sizeRefreshPeriod:      manager.azureCache.refreshInterval,
 		instancesRefreshPeriod: defaultVmssInstancesRefreshPeriod,
 	}}
 	assert.True(t, assert.ObjectsAreEqualValues(expectedAsgs, asgs), "expected %#v, but found: %#v", expectedAsgs, asgs)
