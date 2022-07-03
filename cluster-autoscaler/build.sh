@@ -16,7 +16,7 @@
 
 sudo rm -rf out
 
-VERSION=v1.24.0
+VERSION=v1.24.2
 REGISTRY=fred78290
 
 make -e REGISTRY=$REGISTRY -e TAG=$VERSION -e DOCKER_RM=1 container -e GOARCH=amd64
