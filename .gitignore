@@ -32,3 +32,7 @@ Session.vim
 cluster-autoscaler/out/
 
 cluster-autoscaler/vendor/
+
+cluster-autoscaler/aws.sh
+
+cluster-autoscaler/vsphere.sh
