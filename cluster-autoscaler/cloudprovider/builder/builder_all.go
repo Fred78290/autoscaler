@@ -32,6 +32,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/digitalocean"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/exoscale"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
+	grpccloudprovider "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/grpc"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/hetzner"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
@@ -68,6 +69,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.PacketProviderName,
 	cloudprovider.VultrProviderName,
 	cloudprovider.TencentcloudProviderName,
+	cloudprovider.GrpcProviderName,
 }
 
 // DefaultCloudProvider is GCE.
@@ -117,6 +119,8 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return vultr.BuildVultr(opts, do, rl)
 	case cloudprovider.TencentcloudProviderName:
 		return tencentcloud.BuildTencentcloud(opts, do, rl)
+	case cloudprovider.GrpcProviderName:
+		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}
 	return nil
 }

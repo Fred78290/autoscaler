@@ -72,6 +72,8 @@ const (
 	PacketProviderName = "packet"
 	// TencentcloudProviderName gets the provider name of tencentcloud
 	TencentcloudProviderName = "tencentcloud"
+	// GrpcProviderName gets the provider name of grpc
+	GrpcProviderName = "grpc"
 )
 
 // CloudProvider contains configuration info and functions for interacting with

@@ -28,3 +28,7 @@
 Session.vim
 .netrwhist
 
+
+cluster-autoscaler/out/
+
+cluster-autoscaler/vendor/
