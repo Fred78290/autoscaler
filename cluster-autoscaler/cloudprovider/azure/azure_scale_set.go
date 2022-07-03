@@ -31,9 +31,8 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"sigs.k8s.io/cloud-provider-azure/pkg/retry"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 var (
@@ -53,6 +52,8 @@ type ScaleSet struct {
 	sizeMutex sync.Mutex
 	curSize   int64
 
+	enableDynamicInstanceList bool
+
 	lastSizeRefresh   time.Time
 	sizeRefreshPeriod time.Duration
 
@@ -70,12 +71,13 @@ func NewScaleSet(spec *dynamic.NodeGroupSpec, az *AzureManager, curSize int64) (
 		azureRef: azureRef{
 			Name: spec.Name,
 		},
-		minSize:                spec.MinSize,
-		maxSize:                spec.MaxSize,
-		manager:                az,
-		curSize:                curSize,
-		sizeRefreshPeriod:      az.azureCache.refreshInterval,
-		instancesRefreshJitter: az.config.VmssVmsCacheJitter,
+		minSize:                   spec.MinSize,
+		maxSize:                   spec.MaxSize,
+		manager:                   az,
+		curSize:                   curSize,
+		sizeRefreshPeriod:         az.azureCache.refreshInterval,
+		enableDynamicInstanceList: az.config.EnableDynamicInstanceList,
+		instancesRefreshJitter:    az.config.VmssVmsCacheJitter,
 	}
 
 	if az.config.VmssVmsCacheTTL != 0 {
@@ -152,12 +154,6 @@ func (scaleSet *ScaleSet) getCurSize() (int64, error) {
 	if err != nil {
 		klog.Errorf("failed to get information for VMSS: %s, error: %v", scaleSet.Name, err)
 		return -1, err
-	}
-
-	// If VMSS state is updating, return the currentSize which would've been proactively incremented or decremented by CA
-	if set.VirtualMachineScaleSetProperties != nil && strings.EqualFold(to.String(set.VirtualMachineScaleSetProperties.ProvisioningState), string(compute.ProvisioningStateUpdating)) {
-		klog.V(3).Infof("VMSS %q is in updating state, returning in-memory size: %d", scaleSet.Name, scaleSet.curSize)
-		return scaleSet.curSize, nil
 	}
 
 	vmssSizeMutex.Lock()
@@ -483,7 +479,8 @@ func (scaleSet *ScaleSet) TemplateNodeInfo() (*schedulerframework.NodeInfo, erro
 		return nil, err
 	}
 
-	node, err := buildNodeFromTemplate(scaleSet.Name, template)
+	node, err := buildNodeFromTemplate(scaleSet.Name, template, scaleSet.manager.azClient.skuClient,
+		scaleSet.enableDynamicInstanceList)
 	if err != nil {
 		return nil, err
 	}

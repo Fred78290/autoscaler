@@ -44,6 +44,18 @@ type GceTemplateBuilder struct{}
 // (cf. https://cloud.google.com/compute/docs/disks/local-ssd)
 const LocalSSDDiskSizeInGiB = 375
 
+// These annotations are used internally only to store information in node temlate and use it later in CA, the actuall nodes won't have these annotations.
+const (
+	// LocalSsdCountAnnotation is the annotation for number of attached local SSDs to the node.
+	LocalSsdCountAnnotation = "cluster-autoscaler/gce/local-ssd-count"
+	// BootDiskTypeAnnotation is the annotation for boot disk type of the node.
+	BootDiskTypeAnnotation = "cluster-autoscaler/gce/boot-disk-type"
+	// BootDiskSizeAnnotation is the annotation for boot disk sise of the node/
+	BootDiskSizeAnnotation = "cluster-autoscaler/gce/boot-disk-size"
+	// EphemeralStorageLocalSsdAnnotation is the annotation for nodes where ephemeral storage is backed up by local SSDs.
+	EphemeralStorageLocalSsdAnnotation = "cluster-autoscaler/gce/ephemeral-storage-local-ssd"
+)
+
 // TODO: This should be imported from sigs.k8s.io/gcp-compute-persistent-disk-csi-driver/pkg/common/constants.go
 // This key is applicable to both GCE and GKE
 const gceCSITopologyKeyZone = "topology.gke.io/zone"
@@ -59,7 +71,8 @@ func (t *GceTemplateBuilder) getAcceleratorCount(accelerators []*gce.Accelerator
 }
 
 // BuildCapacity builds a list of resource capacities given list of hardware.
-func (t *GceTemplateBuilder) BuildCapacity(cpu int64, mem int64, accelerators []*gce.AcceleratorConfig, os OperatingSystem, osDistribution OperatingSystemDistribution, ephemeralStorage int64, ephemeralStorageLocalSSDCount int64, pods *int64, version string, r OsReservedCalculator) (apiv1.ResourceList, error) {
+func (t *GceTemplateBuilder) BuildCapacity(cpu int64, mem int64, accelerators []*gce.AcceleratorConfig, os OperatingSystem, osDistribution OperatingSystemDistribution, arch SystemArchitecture,
+	ephemeralStorage int64, ephemeralStorageLocalSSDCount int64, pods *int64, version string, r OsReservedCalculator) (apiv1.ResourceList, error) {
 	capacity := apiv1.ResourceList{}
 	if pods == nil {
 		capacity[apiv1.ResourcePods] = *resource.NewQuantity(110, resource.DecimalSI)
@@ -68,7 +81,7 @@ func (t *GceTemplateBuilder) BuildCapacity(cpu int64, mem int64, accelerators []
 	}
 
 	capacity[apiv1.ResourceCPU] = *resource.NewQuantity(cpu, resource.DecimalSI)
-	memTotal := mem - r.CalculateKernelReserved(mem, os, osDistribution, version)
+	memTotal := mem - r.CalculateKernelReserved(mem, os, osDistribution, arch, version)
 	capacity[apiv1.ResourceMemory] = *resource.NewQuantity(memTotal, resource.DecimalSI)
 
 	if accelerators != nil && len(accelerators) > 0 {
@@ -80,7 +93,7 @@ func (t *GceTemplateBuilder) BuildCapacity(cpu int64, mem int64, accelerators []
 		if ephemeralStorageLocalSSDCount > 0 {
 			storageTotal = ephemeralStorage - EphemeralStorageOnLocalSSDFilesystemOverheadInBytes(ephemeralStorageLocalSSDCount, osDistribution)
 		} else {
-			storageTotal = ephemeralStorage - r.CalculateOSReservedEphemeralStorage(ephemeralStorage, os, osDistribution, version)
+			storageTotal = ephemeralStorage - r.CalculateOSReservedEphemeralStorage(ephemeralStorage, os, osDistribution, arch, version)
 		}
 		capacity[apiv1.ResourceEphemeralStorage] = *resource.NewQuantity(int64(math.Max(float64(storageTotal), 0)), resource.DecimalSI)
 	}
@@ -174,19 +187,34 @@ func (t *GceTemplateBuilder) BuildNodeFromTemplate(mig Mig, template *gce.Instan
 	if osDistribution == OperatingSystemDistributionUnknown {
 		return nil, fmt.Errorf("could not obtain os-distribution from kube-env from template metadata")
 	}
+	arch, err := extractSystemArchitectureFromKubeEnv(kubeEnvValue)
+	if err != nil {
+		arch = DefaultArch
+		klog.Errorf("Couldn't extract architecture from kube-env for MIG %q, falling back to %q. Error: %v", mig.Id(), arch, err)
+	}
 
 	var ephemeralStorage int64 = -1
-	ssdCount := ephemeralStorageLocalSSDCount(kubeEnvValue)
-	if ssdCount > 0 {
-		ephemeralStorage, err = getLocalSSDEphemeralStorageFromInstanceTemplateProperties(template.Properties, ssdCount)
-	} else if !isBootDiskEphemeralStorageWithInstanceTemplateDisabled(kubeEnvValue) {
+
+	if !isBootDiskEphemeralStorageWithInstanceTemplateDisabled(kubeEnvValue) {
+		addBootDiskAnnotations(&node, template.Properties)
 		ephemeralStorage, err = getBootDiskEphemeralStorageFromInstanceTemplateProperties(template.Properties)
+	} else {
+		addAnnotation(&node, EphemeralStorageLocalSsdAnnotation, strconv.FormatBool(true))
+	}
+
+	localSsdCount, err := getLocalSsdCount(template.Properties)
+	if localSsdCount > 0 {
+		addAnnotation(&node, LocalSsdCountAnnotation, strconv.FormatInt(localSsdCount, 10))
+	}
+	ephemeralStorageLocalSsdCount := ephemeralStorageLocalSSDCount(kubeEnvValue)
+	if err == nil && ephemeralStorageLocalSsdCount > 0 {
+		ephemeralStorage, err = getEphemeralStorageOnLocalSsd(localSsdCount, ephemeralStorageLocalSsdCount)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch ephemeral storage from instance template: %v", err)
 	}
 
-	capacity, err := t.BuildCapacity(cpu, mem, template.Properties.GuestAccelerators, os, osDistribution, ephemeralStorage, ssdCount, pods, mig.Version(), reserved)
+	capacity, err := t.BuildCapacity(cpu, mem, template.Properties.GuestAccelerators, os, osDistribution, arch, ephemeralStorage, ephemeralStorageLocalSsdCount, pods, mig.Version(), reserved)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +257,7 @@ func (t *GceTemplateBuilder) BuildNodeFromTemplate(mig Mig, template *gce.Instan
 		node.Status.Allocatable = nodeAllocatable
 	}
 	// GenericLabels
-	labels, err := BuildGenericLabels(mig.GceRef(), template.Properties.MachineType, nodeName, os)
+	labels, err := BuildGenericLabels(mig.GceRef(), template.Properties.MachineType, nodeName, os, arch)
 	if err != nil {
 		return nil, err
 	}
@@ -260,11 +288,10 @@ func ephemeralStorageLocalSSDCount(kubeEnvValue string) int64 {
 	return int64(n)
 }
 
-func getLocalSSDEphemeralStorageFromInstanceTemplateProperties(instanceProperties *gce.InstanceProperties, ssdCount int64) (ephemeralStorage int64, err error) {
+func getLocalSsdCount(instanceProperties *gce.InstanceProperties) (int64, error) {
 	if instanceProperties.Disks == nil {
 		return 0, fmt.Errorf("instance properties disks is nil")
 	}
-
 	var count int64
 	for _, disk := range instanceProperties.Disks {
 		if disk != nil && disk.InitializeParams != nil {
@@ -273,12 +300,14 @@ func getLocalSSDEphemeralStorageFromInstanceTemplateProperties(instancePropertie
 			}
 		}
 	}
+	return count, nil
+}
 
-	if count < ssdCount {
+func getEphemeralStorageOnLocalSsd(localSsdCount, ephemeralStorageLocalSsdCount int64) (int64, error) {
+	if localSsdCount < ephemeralStorageLocalSsdCount {
 		return 0, fmt.Errorf("actual local SSD count is lower than ephemeral_storage_local_ssd_count")
 	}
-
-	return ssdCount * LocalSSDDiskSizeInGiB * units.GiB, nil
+	return ephemeralStorageLocalSsdCount * LocalSSDDiskSizeInGiB * units.GiB, nil
 }
 
 // isBootDiskEphemeralStorageWithInstanceTemplateDisabled will allow bypassing Disk Size of Boot Disk from being
@@ -310,7 +339,7 @@ func getBootDiskEphemeralStorageFromInstanceTemplateProperties(instancePropertie
 
 // BuildGenericLabels builds basic labels that should be present on every GCE node,
 // including hostname, zone etc.
-func BuildGenericLabels(ref GceRef, machineType string, nodeName string, os OperatingSystem) (map[string]string, error) {
+func BuildGenericLabels(ref GceRef, machineType string, nodeName string, os OperatingSystem, arch SystemArchitecture) (map[string]string, error) {
 	result := make(map[string]string)
 
 	if os == OperatingSystemUnknown {
@@ -318,7 +347,7 @@ func BuildGenericLabels(ref GceRef, machineType string, nodeName string, os Oper
 	}
 
 	// TODO: extract it somehow
-	result[apiv1.LabelArchStable] = cloudprovider.DefaultArch
+	result[apiv1.LabelArchStable] = arch.Name()
 	result[apiv1.LabelOSStable] = string(os)
 
 	result[apiv1.LabelInstanceTypeStable] = machineType
@@ -531,6 +560,53 @@ func extractOperatingSystemDistributionFromImageType(imageType string) Operating
 	}
 }
 
+// SystemArchitecture denotes distribution of the System Architecture used by nodes coming from node group
+type SystemArchitecture string
+
+const (
+	// UnknownArch is used if the Architecture is Unknown
+	UnknownArch SystemArchitecture = ""
+	// Amd64 is used if the Architecture is x86_64
+	Amd64 SystemArchitecture = "amd64"
+	// Arm64 is used if the Architecture is ARM
+	Arm64 SystemArchitecture = "arm64"
+	// DefaultArch is used if the Architecture is used as a fallback if not passed by AUTOSCALER_ENV_VARS
+	DefaultArch SystemArchitecture = Amd64
+)
+
+// Name returns the string value for SystemArchitecture
+func (s SystemArchitecture) Name() string {
+	return string(s)
+}
+
+func extractSystemArchitectureFromKubeEnv(kubeEnv string) (SystemArchitecture, error) {
+	archName, found, err := extractAutoscalerVarFromKubeEnv(kubeEnv, "arch")
+	if err != nil {
+		return UnknownArch, fmt.Errorf("error while obtaining arch from AUTOSCALER_ENV_VARS: %v", err)
+	}
+	if !found {
+		return UnknownArch, fmt.Errorf("no arch defined in AUTOSCALER_ENV_VARS")
+	}
+	arch := ToSystemArchitecture(archName)
+	if arch == UnknownArch {
+		return UnknownArch, fmt.Errorf("unknown arch %q defined in AUTOSCALER_ENV_VARS", archName)
+	}
+	return arch, nil
+}
+
+// ToSystemArchitecture parses a string to SystemArchitecture. Returns UnknownArch if the string doesn't represent a
+// valid architecture.
+func ToSystemArchitecture(arch string) SystemArchitecture {
+	switch arch {
+	case string(Arm64):
+		return Arm64
+	case string(Amd64):
+		return Amd64
+	default:
+		return UnknownArch
+	}
+}
+
 func extractOperatingSystemDistributionFromKubeEnv(kubeEnv string) OperatingSystemDistribution {
 	osDistributionValue, found, err := extractAutoscalerVarFromKubeEnv(kubeEnv, "os_distribution")
 	if err != nil {
@@ -691,4 +767,26 @@ func buildTaints(kubeEnvTaints map[string]string) ([]apiv1.Taint, error) {
 		})
 	}
 	return taints, nil
+}
+
+func addAnnotation(node *apiv1.Node, key, value string) {
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
+	node.Annotations[key] = value
+}
+
+func addBootDiskAnnotations(node *apiv1.Node, instanceProperties *gce.InstanceProperties) {
+	if instanceProperties.Disks == nil {
+		return
+	}
+
+	for _, disk := range instanceProperties.Disks {
+		if disk != nil && disk.InitializeParams != nil {
+			if disk.Boot {
+				addAnnotation(node, BootDiskSizeAnnotation, strconv.FormatInt(disk.InitializeParams.DiskSizeGb, 10))
+				addAnnotation(node, BootDiskTypeAnnotation, disk.InitializeParams.DiskType)
+			}
+		}
+	}
 }

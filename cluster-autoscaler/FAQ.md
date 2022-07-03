@@ -28,6 +28,7 @@ this document:
 * [How to?](#how-to)
   * [I'm running cluster with nodes in multiple zones for HA purposes. Is that supported by Cluster Autoscaler?](#im-running-cluster-with-nodes-in-multiple-zones-for-ha-purposes-is-that-supported-by-cluster-autoscaler)
   * [How can I monitor Cluster Autoscaler?](#how-can-i-monitor-cluster-autoscaler)
+  * [How can I see all the events from Cluster Autoscaler?](#how-can-i-see-all-events-from-cluster-autoscaler)
   * [How can I scale my cluster to just 1 node?](#how-can-i-scale-my-cluster-to-just-1-node)
   * [How can I scale a node group to 0?](#how-can-i-scale-a-node-group-to-0)
   * [How can I prevent Cluster Autoscaler from scaling down a particular node?](#how-can-i-prevent-cluster-autoscaler-from-scaling-down-a-particular-node)
@@ -98,7 +99,7 @@ matching anti-affinity, etc)
 "cluster-autoscaler.kubernetes.io/safe-to-evict": "true"
 ```
 
-__Or__ you have have overridden this behaviour with one of the relevant flags. [See below for more information on these flags.](#what-are-the-parameters-to-ca)
+__Or__ you have overridden this behaviour with one of the relevant flags. [See below for more information on these flags.](#what-are-the-parameters-to-ca)
 
 ### Which version on Cluster Autoscaler should I use in my cluster?
 
@@ -267,6 +268,16 @@ respectively under `/metrics` and `/health-check`.
 Metrics are provided in Prometheus format and their detailed description is
 available [here](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/proposals/metrics.md).
 
+### How can I see all events from Cluster Autoscaler?
+
+By default, the Cluster Autoscaler will deduplicate similar events that occur within a 5 minute
+window. This is done to improve scalability performance where many similar events might be
+triggered in a short timespan, such as when there are too many unscheduled pods.
+
+In some cases, such as for debugging or when scalability of events is not an issue, you might
+want to see all the events coming from the Cluster Autoscaler. In these scenarios you should
+use the `--record-duplicated-events` command line flag.
+
 ### How can I scale my cluster to just 1 node?
 
 Prior to version 0.6, Cluster Autoscaler was not touching nodes that were running important
@@ -367,10 +378,10 @@ globalDefault: false
 description: "Priority class used by overprovisioning."
 ```
 
-**For 1.11:**
+**For 1.11+:**
 
 ```yaml
-apiVersion: scheduling.k8s.io/v1beta1
+apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: overprovisioning
@@ -532,7 +543,7 @@ any nodes left unregistered after this time.
 Every 10 seconds (configurable by `--scan-interval` flag), if no scale-up is
 needed, Cluster Autoscaler checks which nodes are unneeded. A node is considered for removal when **all** below conditions hold:
 
-* The sum of cpu and memory requests of all pods running on this node is smaller
+* The sum of cpu and memory requests of all pods running on this node (DaemonSet pods and Mirror pods are included by default but this is configurable with `--ignore-daemonsets-utilization` and `--ignore-mirror-pods-utilization` flags) is smaller
   than 50% of the node's allocatable. (Before 1.1.0, node capacity was used
   instead of allocatable.) Utilization threshold can be configured using
   `--scale-down-utilization-threshold` flag.
@@ -734,6 +745,8 @@ The following startup parameters are supported for cluster autoscaler:
 | `emit-per-nodegroup-metrics` | If true, emit per node group metrics. | false
 | `estimator` | Type of resource estimator to be used in scale up | binpacking
 | `expander` | Type of node group expander to be used in scale up.  | random
+| `ignore-daemonsets-utilization` | Whether DaemonSet pods will be ignored when calculating resource utilization for scaling down | false
+| `ignore-mirror-pods-utilization` | Whether Mirror pods will be ignored when calculating resource utilization for scaling down | false
 | `write-status-configmap` | Should CA write status information to a configmap  | true
 | `status-config-map-name` | The name of the status ConfigMap that CA writes  | cluster-autoscaler-status
 | `max-inactivity` | Maximum time from last recorded autoscaler activity before automatic restart | 10 minutes
@@ -757,6 +770,8 @@ The following startup parameters are supported for cluster autoscaler:
 | `daemonset-eviction-for-empty-nodes` | Whether DaemonSet pods will be gracefully terminated from empty nodes | false
 | `daemonset-eviction-for-occupied-nodes` | Whether DaemonSet pods will be gracefully terminated from non-empty nodes | true
 | `feature-gates` | A set of key=value pairs that describe feature gates for alpha/experimental features. | ""
+| `cordon-node-before-terminating` | Should CA cordon nodes before terminating during downscale process | false
+| `record-duplicated-events` | Enable the autoscaler to print duplicated events within a 5 minute window. | false
 
 # Troubleshooting:
 

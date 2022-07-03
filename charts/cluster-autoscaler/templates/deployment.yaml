@@ -3,9 +3,12 @@
 apiVersion: {{ template "deployment.apiVersion" . }}
 kind: Deployment
 metadata:
+  annotations:
+{{ toYaml .Values.deployment.annotations | indent 4 }}
   labels:
 {{ include "cluster-autoscaler.labels" . | indent 4 }}
   name: {{ template "cluster-autoscaler.fullname" . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -227,7 +230,7 @@ spec:
               mountPath: {{ .Values.clusterAPIWorkloadKubeconfigPath | trimSuffix "/value" }}
           {{- end }}
           {{- if .Values.extraVolumeMounts }}
-            {{ toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
           {{- end }}
           {{- end }}
     {{- if .Values.affinity }}
@@ -271,7 +274,7 @@ spec:
             {{- end }}
       {{- end }}
       {{- if .Values.extraVolumes }}
-        {{- toYaml .Values.extraVolumes | nindent 10 }}
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
       {{- end }}
       {{- if .Values.clusterAPIKubeconfigSecret }}
         - name: cluster-api-kubeconfig

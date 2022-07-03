@@ -53,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	netutils "k8s.io/utils/net"
 )
 
@@ -287,9 +286,6 @@ var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountNa
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 var ValidateEndpointsName = apimachineryvalidation.NameIsDNSSubdomain
-
-// ValidateClusterName can be used to check whether the given cluster name is valid.
-var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 
 // ValidateClassName can be used to check whether the given class name is valid.
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
@@ -1589,12 +1585,12 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 
 	if csi.NodePublishSecretRef != nil {
 		if len(csi.NodePublishSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef", "name"), ""))
 		} else {
 			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Name, fldPath.Child("name"))...)
 		}
 		if len(csi.NodePublishSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "namespace"), ""))
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef", "namespace"), ""))
 		} else {
 			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
@@ -1609,7 +1605,7 @@ func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) fie
 
 	if csi.NodePublishSecretRef != nil {
 		if len(csi.NodePublishSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef", "name"), ""))
 		} else {
 			for _, msg := range ValidateSecretName(csi.NodePublishSecretRef.Name, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), csi.NodePublishSecretRef.Name, msg))
@@ -2023,8 +2019,6 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 type PersistentVolumeClaimSpecValidationOptions struct {
 	// Allow spec to contain the "ReadWiteOncePod" access mode
 	AllowReadWriteOncePod bool
-	// Allow pvc expansion after PVC is created and bound to a PV
-	EnableExpansion bool
 	// Allow users to recover from previously failing expansion operation
 	EnableRecoverFromExpansionFailure bool
 }
@@ -2032,7 +2026,6 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		AllowReadWriteOncePod:             utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-		EnableExpansion:                   utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes),
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 	}
 	if oldPvc == nil {
@@ -2179,39 +2172,29 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 	}
 
-	if opts.EnableExpansion {
-		// lets make sure storage values are same.
-		if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
-			newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
-		}
+	// lets make sure storage values are same.
+	if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
+		newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
+	}
 
-		oldSize := oldPvc.Spec.Resources.Requests["storage"]
-		newSize := newPvc.Spec.Resources.Requests["storage"]
-		statusSize := oldPvc.Status.Capacity["storage"]
+	oldSize := oldPvc.Spec.Resources.Requests["storage"]
+	newSize := newPvc.Spec.Resources.Requests["storage"]
+	statusSize := oldPvc.Status.Capacity["storage"]
 
-		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
-			specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
-		}
-		if newSize.Cmp(oldSize) < 0 {
-			if !opts.EnableRecoverFromExpansionFailure {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
-			} else {
-				// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
-				// so that users can recover from volume expansion failure, but Kubernetes does not actually
-				// support volume shrinking
-				if newSize.Cmp(statusSize) <= 0 {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than status.capacity"))
-				}
+	if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
+		specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
+	}
+	if newSize.Cmp(oldSize) < 0 {
+		if !opts.EnableRecoverFromExpansionFailure {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+		} else {
+			// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
+			// so that users can recover from volume expansion failure, but Kubernetes does not actually
+			// support volume shrinking
+			if newSize.Cmp(statusSize) <= 0 {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than status.capacity"))
 			}
-		}
-
-	} else {
-		// changes to Spec are not allowed, but updates to label/and some annotations are OK.
-		// no-op updates pass validation.
-		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
-			specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("field is immutable after creation\n%v", specDiff)))
 		}
 	}
 
@@ -4058,12 +4041,22 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))
 		}
 
-		if err := apparmor.ValidateProfileFormat(p); err != nil {
+		if err := ValidateAppArmorProfileFormat(p); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), p, err.Error()))
 		}
 	}
 
 	return allErrs
+}
+
+func ValidateAppArmorProfileFormat(profile string) error {
+	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault || profile == v1.AppArmorBetaProfileNameUnconfined {
+		return nil
+	}
+	if !strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
+	}
+	return nil
 }
 
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
@@ -5755,7 +5748,7 @@ func validateResourceQuantityHugePageValue(name core.ResourceName, quantity reso
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
-func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, opts ResourceQuotaValidationOptions, fld *field.Path) field.ErrorList {
+func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(resourceQuotaSpec.Scopes) == 0 {
 		return allErrs
@@ -5767,7 +5760,7 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, opts
 	fldPath := fld.Child("scopes")
 	scopeSet := sets.NewString()
 	for _, scope := range resourceQuotaSpec.Scopes {
-		if !helper.IsStandardResourceQuotaScope(string(scope), opts.AllowPodAffinityNamespaceSelector) {
+		if !helper.IsStandardResourceQuotaScope(string(scope)) {
 			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
@@ -5790,7 +5783,7 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, opts
 }
 
 // validateScopedResourceSelectorRequirement tests that the match expressions has valid data
-func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQuotaSpec, opts ResourceQuotaValidationOptions, fld *field.Path) field.ErrorList {
+func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	hardLimits := sets.NewString()
 	for k := range resourceQuotaSpec.Hard {
@@ -5799,7 +5792,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 	fldPath := fld.Child("matchExpressions")
 	scopeSet := sets.NewString()
 	for _, req := range resourceQuotaSpec.ScopeSelector.MatchExpressions {
-		if !helper.IsStandardResourceQuotaScope(string(req.ScopeName), opts.AllowPodAffinityNamespaceSelector) {
+		if !helper.IsStandardResourceQuotaScope(string(req.ScopeName)) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scopeName"), req.ScopeName, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
@@ -5845,26 +5838,20 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 }
 
 // validateScopeSelector tests that the specified scope selector has valid data
-func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, opts ResourceQuotaValidationOptions, fld *field.Path) field.ErrorList {
+func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if resourceQuotaSpec.ScopeSelector == nil {
 		return allErrs
 	}
-	allErrs = append(allErrs, validateScopedResourceSelectorRequirement(resourceQuotaSpec, opts, fld.Child("scopeSelector"))...)
+	allErrs = append(allErrs, validateScopedResourceSelectorRequirement(resourceQuotaSpec, fld.Child("scopeSelector"))...)
 	return allErrs
 }
 
-// ResourceQuotaValidationOptions contains the different settings for ResourceQuota validation
-type ResourceQuotaValidationOptions struct {
-	// Allow pod-affinity namespace selector validation.
-	AllowPodAffinityNamespaceSelector bool
-}
-
 // ValidateResourceQuota tests if required fields in the ResourceQuota are set.
-func ValidateResourceQuota(resourceQuota *core.ResourceQuota, opts ResourceQuotaValidationOptions) field.ErrorList {
+func ValidateResourceQuota(resourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, ValidateResourceQuotaSpec(&resourceQuota.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&resourceQuota.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateResourceQuotaStatus(&resourceQuota.Status, field.NewPath("status"))...)
 
 	return allErrs
@@ -5889,7 +5876,7 @@ func ValidateResourceQuotaStatus(status *core.ResourceQuotaStatus, fld *field.Pa
 	return allErrs
 }
 
-func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, opts ResourceQuotaValidationOptions, fld *field.Path) field.ErrorList {
+func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	fldPath := fld.Child("hard")
@@ -5899,8 +5886,8 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, opts R
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 
-	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, opts, fld)...)
-	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, opts, fld)...)
+	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
+	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
 
 	return allErrs
 }
@@ -5918,9 +5905,9 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 }
 
 // ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
-func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota, opts ResourceQuotaValidationOptions) field.ErrorList {
+func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
 	fldPath := field.NewPath("spec", "scopes")
@@ -6525,6 +6512,7 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := ValidateSpreadConstraintNotRepeat(subFldPath.Child("{topologyKey, whenUnsatisfiable}"), constraint, constraints[i+1:]); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		allErrs = append(allErrs, validateMinDomains(subFldPath.Child("minDomains"), constraint.MinDomains, constraint.WhenUnsatisfiable)...)
 	}
 
 	return allErrs
@@ -6536,6 +6524,22 @@ func ValidateMaxSkew(fldPath *field.Path, maxSkew int32) *field.Error {
 		return field.Invalid(fldPath, maxSkew, isNotPositiveErrorMsg)
 	}
 	return nil
+}
+
+// validateMinDomains tests that the argument is a valid MinDomains.
+func validateMinDomains(fldPath *field.Path, minDomains *int32, action core.UnsatisfiableConstraintAction) field.ErrorList {
+	if minDomains == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	if *minDomains <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, minDomains, isNotPositiveErrorMsg))
+	}
+	// When MinDomains is non-nil, whenUnsatisfiable must be DoNotSchedule.
+	if action != core.DoNotSchedule {
+		allErrs = append(allErrs, field.Invalid(fldPath, minDomains, fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(action))))
+	}
+	return allErrs
 }
 
 // ValidateTopologyKey tests that the argument is a valid TopologyKey.

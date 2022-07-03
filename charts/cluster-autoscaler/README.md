@@ -238,72 +238,9 @@ The command removes all the Kubernetes components associated with the chart and 
 
 ### AWS - IAM
 
-The worker running the cluster autoscaler will need access to certain resources and actions:
+The worker running the cluster autoscaler will need access to certain resources and actions depending on the version you run and your configuration of it.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "autoscaling:DescribeAutoScalingGroups",
-        "autoscaling:DescribeAutoScalingInstances",
-        "autoscaling:DescribeLaunchConfigurations",
-        "autoscaling:DescribeTags",
-        "autoscaling:SetDesiredCapacity",
-        "autoscaling:TerminateInstanceInAutoScalingGroup"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-- `DescribeTags` is required for autodiscovery.
-- `DescribeLaunchConfigurations` is required to scale up an ASG from 0.
-
-If you would like to limit the scope of the Cluster Autoscaler to ***only*** modify ASGs for a particular cluster, use the following policy instead:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "autoscaling:DescribeAutoScalingGroups",
-        "autoscaling:DescribeAutoScalingInstances",
-        "autoscaling:DescribeLaunchConfigurations",
-        "autoscaling:DescribeTags",
-        "ec2:DescribeLaunchTemplateVersions"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "autoscaling:SetDesiredCapacity",
-        "autoscaling:TerminateInstanceInAutoScalingGroup",
-        "autoscaling:UpdateAutoScalingGroup"
-      ],
-      "Resource": [
-        "arn:aws:autoscaling:<aws-region>:<account-id>:autoScalingGroup:<some-random-id>:autoScalingGroupName/node-group-1",
-        "arn:aws:autoscaling:<aws-region>:<account-id>:autoScalingGroup:<some-random-id>:autoScalingGroupName/node-group-2",
-        "arn:aws:autoscaling:<aws-region>:<account-id>:autoScalingGroup:<some-random-id>:autoScalingGroupName/node-group-3"
-      ],
-      "Condition": {
-        "StringEquals": {
-          "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/enabled": "true",
-          "autoscaling:ResourceTag/kubernetes.io/cluster/<cluster-name>": "owned"
-        }
-      }
-    }
-  ]
-}
-```
-
-Make sure to replace the variables `<aws-region>`, `<cluster-name>`, `<account-id>`, and the ARNs of the ASGs where applicable.
+For the up-to-date IAM permissions required, please see the [cluster autoscaler's AWS Cloudprovider Readme](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/README.md#iam-policy) and switch to the tag of the cluster autoscaler image you are using.
 
 ### AWS - IAM Roles for Service Accounts (IRSA)
 
@@ -376,6 +313,7 @@ Though enough for the majority of installations, the default PodSecurityPolicy _
 | clusterAPIMode | string | `"incluster-incluster"` | Cluster API mode, see https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/clusterapi/README.md#connecting-cluster-autoscaler-to-cluster-api-management-and-workload-clusters Syntax: workloadClusterMode-ManagementClusterMode for `kubeconfig-kubeconfig`, `incluster-kubeconfig` and `single-kubeconfig` you always must mount the external kubeconfig using either `extraVolumeSecrets` or `extraMounts` and `extraVolumes` if you dont set `clusterAPIKubeconfigSecret`and thus use an in-cluster config or want to use a non capi generated kubeconfig you must do so for the workload kubeconfig as well |
 | clusterAPIWorkloadKubeconfigPath | string | `"/etc/kubernetes/value"` | Path to kubeconfig for connecting to Cluster API managed workloadcluster, only used if `clusterAPIMode=kubeconfig-kubeconfig or kubeconfig-incluster` |
 | containerSecurityContext | object | `{}` | [Security context for container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
+| deployment.annotations | object | `{}` | Annotations to add to the Deployment object. |
 | dnsPolicy | string | `"ClusterFirst"` | Defaults to `ClusterFirst`. Valid values are: `ClusterFirstWithHostNet`, `ClusterFirst`, `Default` or `None`. If autoscaler does not depend on cluster DNS, recommended to set this to `Default`. |
 | envFromConfigMap | string | `""` | ConfigMap name to use as envFrom. |
 | envFromSecret | string | `""` | Secret name to use as envFrom. |
@@ -418,6 +356,7 @@ Though enough for the majority of installations, the default PodSecurityPolicy _
 | resources | object | `{}` | Pod resource requests and limits. |
 | securityContext | object | `{}` | [Security context for pod](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
 | service.annotations | object | `{}` | Annotations to add to service |
+| service.create | bool | `true` | If `true`, a Service will be created. |
 | service.externalIPs | list | `[]` | List of IP addresses at which the service is available. Ref: https://kubernetes.io/docs/user-guide/services/#external-ips. |
 | service.labels | object | `{}` | Labels to add to service |
 | service.loadBalancerIP | string | `""` | IP address to assign to load balancer (if supported). |
