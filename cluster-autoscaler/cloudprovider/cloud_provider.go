@@ -84,6 +84,8 @@ const (
 	CivoProviderName = "civo"
 	// RancherProviderName gets the provider name of rancher
 	RancherProviderName = "rancher"
+	// GrpcProviderName gets the provider name of grpc
+	GrpcProviderName = "grpc"
 )
 
 // CloudProvider contains configuration info and functions for interacting with
