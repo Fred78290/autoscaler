@@ -1,5 +1,5 @@
-//go:build !gce && !aws && !azure && !kubemark && !alicloud && !magnum && !digitalocean && !clusterapi && !huaweicloud && !ionoscloud && !linode && !hetzner && !bizflycloud && !brightbox && !packet && !oci && !vultr && !tencentcloud && !externalgrpc
-// +build !gce,!aws,!azure,!kubemark,!alicloud,!magnum,!digitalocean,!clusterapi,!huaweicloud,!ionoscloud,!linode,!hetzner,!bizflycloud,!brightbox,!packet,!oci,!vultr,!tencentcloud,!externalgrpc
+//go:build !gce && !aws && !azure && !kubemark && !alicloud && !magnum && !digitalocean && !clusterapi && !huaweicloud && !ionoscloud && !linode && !hetzner && !bizflycloud && !brightbox && !packet && !oci && !vultr && !tencentcloud && !scaleway && !externalgrpc && !civo && !rancher
+// +build !gce,!aws,!azure,!kubemark,!alicloud,!magnum,!digitalocean,!clusterapi,!huaweicloud,!ionoscloud,!linode,!hetzner,!bizflycloud,!brightbox,!packet,!oci,!vultr,!tencentcloud,!scaleway,!externalgrpc,!civo,!rancher
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -28,6 +28,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/bizflycloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/brightbox"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cherryservers"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/civo"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cloudstack"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/digitalocean"
@@ -38,11 +39,14 @@ import (
 	grpccloudprovider "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/grpc"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kamatera"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/linode"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/oci"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ovhcloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/packet"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/rancher"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/scaleway"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/tencentcloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vultr"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
@@ -67,6 +71,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.OVHcloudProviderName,
 	cloudprovider.ClusterAPIProviderName,
 	cloudprovider.IonoscloudProviderName,
+	cloudprovider.KamateraProviderName,
 	cloudprovider.LinodeProviderName,
 	grpccloudprovider.ProviderName,
 	cloudprovider.BizflyCloudProviderName,
@@ -74,6 +79,9 @@ var AvailableCloudProviders = []string{
 	cloudprovider.PacketProviderName,
 	cloudprovider.VultrProviderName,
 	cloudprovider.TencentcloudProviderName,
+	cloudprovider.CivoProviderName,
+	cloudprovider.ScalewayProviderName,
+	cloudprovider.RancherProviderName,
 }
 
 // DefaultCloudProvider is GCE.
@@ -119,6 +127,8 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return clusterapi.BuildClusterAPI(opts, do, rl)
 	case cloudprovider.IonoscloudProviderName:
 		return ionoscloud.BuildIonosCloud(opts, do, rl)
+	case cloudprovider.KamateraProviderName:
+		return kamatera.BuildKamatera(opts, do, rl)
 	case cloudprovider.LinodeProviderName:
 		return linode.BuildLinode(opts, do, rl)
 	case cloudprovider.OracleCloudProviderName:
@@ -127,6 +137,12 @@ func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGro
 		return vultr.BuildVultr(opts, do, rl)
 	case cloudprovider.TencentcloudProviderName:
 		return tencentcloud.BuildTencentcloud(opts, do, rl)
+	case cloudprovider.CivoProviderName:
+		return civo.BuildCivo(opts, do, rl)
+	case cloudprovider.ScalewayProviderName:
+		return scaleway.BuildScaleway(opts, do, rl)
+	case cloudprovider.RancherProviderName:
+		return rancher.BuildRancher(opts, do, rl)
 	case grpccloudprovider.ProviderName:
 		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}

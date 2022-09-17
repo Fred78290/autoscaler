@@ -17,15 +17,14 @@ limitations under the License.
 package aws
 
 import (
-	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/aws/aws-sdk-go/aws"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/aws/aws-sdk-go/service/autoscaling"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 )
 
@@ -119,8 +118,7 @@ func TestInstanceTypeFallback(t *testing.T) {
 	do := cloudprovider.NodeGroupDiscoveryOptions{}
 	opts := config.AutoscalingOptions{}
 
-	os.Setenv("AWS_REGION", "non-existent-region")
-	defer os.Unsetenv("AWS_REGION")
+	t.Setenv("AWS_REGION", "non-existent-region")
 
 	// This test ensures that no klog.Fatalf calls occur when constructing the AWS cloud provider.  Specifically it is
 	// intended to ensure that instance type fallback works correctly in the event of an error enumerating instance
@@ -151,26 +149,12 @@ func TestAutoDiscoveredNodeGroups(t *testing.T) {
 		},
 	}))
 
-	a.On("DescribeTagsPages",
-		&autoscaling.DescribeTagsInput{
-			Filters: []*autoscaling.Filter{
-				{Name: aws.String("key"), Values: aws.StringSlice([]string{"test"})},
-			},
-			MaxRecords: aws.Int64(maxRecordsReturnedByAPI),
-		},
-		mock.AnythingOfType("func(*autoscaling.DescribeTagsOutput, bool) bool"),
-	).Run(func(args mock.Arguments) {
-		fn := args.Get(1).(func(*autoscaling.DescribeTagsOutput, bool) bool)
-		fn(&autoscaling.DescribeTagsOutput{
-			Tags: []*autoscaling.TagDescription{
-				{ResourceId: aws.String("auto-asg")},
-			}}, false)
-	}).Return(nil).Once()
-
 	a.On("DescribeAutoScalingGroupsPages",
 		&autoscaling.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: aws.StringSlice([]string{"auto-asg"}),
-			MaxRecords:            aws.Int64(maxRecordsReturnedByAPI),
+			Filters: []*autoscaling.Filter{
+				{Name: aws.String("tag-key"), Values: aws.StringSlice([]string{"test"})},
+			},
+			MaxRecords: aws.Int64(maxRecordsReturnedByAPI),
 		},
 		mock.AnythingOfType("func(*autoscaling.DescribeAutoScalingGroupsOutput, bool) bool"),
 	).Run(func(args mock.Arguments) {

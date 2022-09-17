@@ -419,6 +419,7 @@ spec:
         run: overprovisioning
     spec:
       priorityClassName: overprovisioning
+      terminationGracePeriodSeconds: 0
       containers:
       - name: reserve-resources
         image: k8s.gcr.io/pause
@@ -444,10 +445,10 @@ spec:
         app: overprovisioning-autoscaler
     spec:
       containers:
-        - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2
+        - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.8.1
           name: autoscaler
           command:
-            - ./cluster-proportional-autoscaler
+            - /cluster-proportional-autoscaler
             - --namespace=default
             - --configmap=overprovisioning-autoscaler
             - --default-params={"linear":{"coresPerReplica":1}}
@@ -731,7 +732,7 @@ The following startup parameters are supported for cluster autoscaler:
 | `scale-down-candidates-pool-min-count` | Minimum number of nodes that are considered as additional non empty candidates<br>for scale down when some candidates from previous iteration are no longer valid.<br>When calculating the pool size for additional candidates we take<br>`max(#nodes * scale-down-candidates-pool-ratio, scale-down-candidates-pool-min-count)` | 50
 | `scan-interval` | How often cluster is reevaluated for scale up or down | 10 seconds
 | `max-nodes-total` | Maximum number of nodes in all node groups. Cluster autoscaler will not grow the cluster beyond this number. | 0
-| `cores-total` | Minimum and maximum number of cores in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 320000
+| `cores-total` | Minimum and maximum number of cores in cluster, in the format \<min>:\<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 320000
 | `memory-total` | Minimum and maximum number of gigabytes of memory in cluster, in the format \<min>:\<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 6400000
 | `gpu-total` | Minimum and maximum number of different GPUs in cluster, in the format <gpu_type>:\<min>:\<max>. Cluster autoscaler will not scale the cluster beyond these numbers. Can be passed multiple times. CURRENTLY THIS FLAG ONLY WORKS ON GKE. | ""
 | `cloud-provider` | Cloud provider type. | gce
@@ -753,6 +754,7 @@ The following startup parameters are supported for cluster autoscaler:
 | `max-failing-time` | Maximum time from last recorded successful autoscaler run before automatic restart | 15 minutes
 | `balance-similar-node-groups` | Detect similar node groups and balance the number of nodes between them | false
 | `balancing-ignore-label` | Define a node label that should be ignored when considering node group similarity. One label per flag occurrence. | ""
+| `balancing-label` | Define a node label to use when comparing node group similarity. If set, all other comparison logic is disabled, and only labels are considered when comparing groups. One label per flag occurrence. | ""
 | `node-autoprovisioning-enabled` | Should CA autoprovision node groups when needed | false
 | `max-autoprovisioned-node-group-count` | The maximum number of autoprovisioned groups in the cluster | 15
 | `unremovable-node-recheck-timeout` | The timeout before we check again a node that couldn't be removed before | 5 minutes

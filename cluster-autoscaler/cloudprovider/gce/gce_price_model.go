@@ -19,7 +19,6 @@ package gce
 import (
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -96,7 +95,7 @@ func (model *GcePriceModel) NodePrice(node *apiv1.Node, startTime time.Time, end
 		// Boot disk price
 		bootDiskSize, _ := strconv.ParseInt(node.Annotations[BootDiskSizeAnnotation], 10, 64)
 		if bootDiskSize == 0 {
-			klog.Error("Boot disk size is not found for node %s, using default size %v", node.Name, DefaultBootDiskSize)
+			klog.Errorf("Boot disk size is not found for node %s, using default size %v", node.Name, DefaultBootDiskSize)
 			bootDiskSize = DefaultBootDiskSize
 		}
 		bootDiskType := node.Annotations[BootDiskTypeAnnotation]
@@ -104,7 +103,7 @@ func (model *GcePriceModel) NodePrice(node *apiv1.Node, startTime time.Time, end
 			bootDiskType = val
 		}
 		if bootDiskType == "" {
-			klog.Error("Boot disk type is not found for node %s, using default type %s", node.Name, DefaultBootDiskType)
+			klog.Errorf("Boot disk type is not found for node %s, using default type %s", node.Name, DefaultBootDiskType)
 			bootDiskType = DefaultBootDiskType
 		}
 		bootDiskPrice := model.PriceInfo.BootDiskPricePerHour()[bootDiskType]
@@ -142,10 +141,10 @@ func (model *GcePriceModel) getPreemptibleDiscount(node *apiv1.Node) float64 {
 	if !found {
 		return 1.0
 	}
-	instanceFamily := getInstanceFamily(instanceType)
+	instanceFamily, _ := GetMachineFamily(instanceType)
 
 	discountMap := model.PriceInfo.PredefinedPreemptibleDiscount()
-	if isInstanceCustom(instanceType) {
+	if IsCustomMachine(instanceType) {
 		discountMap = model.PriceInfo.CustomPreemptibleDiscount()
 	}
 
@@ -171,8 +170,8 @@ func (model *GcePriceModel) getBasePrice(resources apiv1.ResourceList, instanceT
 		return 0
 	}
 	hours := getHours(startTime, endTime)
-	instanceFamily := getInstanceFamily(instanceType)
-	isCustom := isInstanceCustom(instanceType)
+	instanceFamily, _ := GetMachineFamily(instanceType)
+	isCustom := IsCustomMachine(instanceType)
 	price := 0.0
 
 	cpu := resources[apiv1.ResourceCPU]
@@ -222,14 +221,6 @@ func getHours(startTime time.Time, endTime time.Time) float64 {
 	minutes := math.Ceil(float64(endTime.Sub(startTime)) / float64(time.Minute))
 	hours := minutes / 60.0
 	return hours
-}
-
-func getInstanceFamily(instanceType string) string {
-	return strings.Split(instanceType, "-")[0]
-}
-
-func isInstanceCustom(instanceType string) bool {
-	return strings.Contains(instanceType, "custom")
 }
 
 // hasPreemptiblePricing returns whether we should use preemptible pricing for a node, based on labels. Spot VMs have
