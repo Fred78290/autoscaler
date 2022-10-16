@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2021 The Kubernetes Authors.
+# Copyright 2019 Frederic Boltz Author. All rights reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,5 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-sudo rm -rf out
-make -e REGISTRY=fred78290 -e TAG=v1.26.0-alpha.0 container
+#ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
+FROM alpine AS builder
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+COPY out .
+RUN ls / ; mv /$TARGETPLATFORM/cluster-autoscaler /cluster-autoscaler
+
+FROM ubuntu:focal
+
+LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
+
+COPY --from=builder /cluster-autoscaler /cluster-autoscaler
+
+CMD ["/cluster-autoscaler"]
