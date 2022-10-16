@@ -17,12 +17,12 @@ limitations under the License.
 package grpccloudprovider
 
 import (
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+	klog "k8s.io/klog/v2"
 )
 
 func ignoreTestMultipassClusterScaling(t *testing.T) {
@@ -73,7 +73,7 @@ func ignoreTestMultipassClusterScaling(t *testing.T) {
 									if assert.Equal(t, instance.Id, providerIDForNode(testGroupID, testNodeName), "Unexpected instance") {
 										if instance.Status != nil {
 											if instance.Status.State != cloudprovider.InstanceRunning {
-												log.Printf("Current status of node is:%d", instance.Status.State)
+												klog.Infof("Current status of node is:%d", instance.Status.State)
 											}
 										}
 
@@ -97,7 +97,7 @@ func ignoreTestMultipassClusterScaling(t *testing.T) {
 												}
 
 												if assert.NoError(t, nodeGroup.DeleteNodes([]*apiv1.Node{node}), "DeleteNodes failed") {
-
+													klog.Infoln("Nodes deleted")
 												}
 											}
 										}

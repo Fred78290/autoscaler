@@ -19,13 +19,12 @@ package grpccloudprovider
 import (
 	"context"
 	fmt "fmt"
-	"log"
 
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	errors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
+	klog "k8s.io/klog/v2"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -56,7 +55,7 @@ func (ng *GrpcNodeGroup) MaxSize() int {
 		r, err := nodeGroupService.MaxSize(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::MaxSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::MaxSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return 0
 		}
@@ -83,7 +82,7 @@ func (ng *GrpcNodeGroup) MinSize() int {
 		r, err := nodeGroupService.MinSize(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::MinSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::MinSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return 0
 		}
@@ -111,11 +110,11 @@ func (ng *GrpcNodeGroup) TargetSize() (int, error) {
 		r, err := nodeGroupService.TargetSize(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::TargetSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::TargetSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return 0, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::TargetSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::TargetSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return 0, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -143,7 +142,7 @@ func (ng *GrpcNodeGroup) Exist() bool {
 		r, err := nodeGroupService.Exist(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Exist for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Exist for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return false
 		}
@@ -170,11 +169,11 @@ func (ng *GrpcNodeGroup) Create() (cloudprovider.NodeGroup, error) {
 		r, err := nodeGroupService.Create(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Create for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Create for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::Create got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::Create got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -204,7 +203,7 @@ func (ng *GrpcNodeGroup) Autoprovisioned() bool {
 		r, err := nodeGroupService.Autoprovisioned(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Autoprovisioned for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Autoprovisioned for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return false
 		}
@@ -232,11 +231,11 @@ func (ng *GrpcNodeGroup) Delete() error {
 		r, err := nodeGroupService.Delete(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Create for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Create for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::Create got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::Create got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -261,11 +260,11 @@ func (ng *GrpcNodeGroup) IncreaseSize(delta int) error {
 		r, err := nodeGroupService.IncreaseSize(ctx, &IncreaseSizeRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name, Delta: int32(delta)})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::IncreaseSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::IncreaseSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::IncreaseSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::IncreaseSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -294,11 +293,11 @@ func (ng *GrpcNodeGroup) DecreaseTargetSize(delta int) error {
 		r, err := nodeGroupService.DecreaseTargetSize(ctx, &DecreaseTargetSizeRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name, Delta: int32(delta)})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::DecreaseTargetSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::DecreaseTargetSize for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::DecreaseTargetSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::DecreaseTargetSize got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -308,7 +307,7 @@ func (ng *GrpcNodeGroup) DecreaseTargetSize(delta int) error {
 }
 
 // Belongs returns true if the given node belongs to the NodeGroup.
-func (ng *GrpcNodeGroup) Belongs(node *apiv1.Node) (bool, error) {
+func (ng *GrpcNodeGroup) Belongs(node *v1.Node) (bool, error) {
 	manager := ng.GetManager()
 
 	manager.Lock()
@@ -323,11 +322,11 @@ func (ng *GrpcNodeGroup) Belongs(node *apiv1.Node) (bool, error) {
 		r, err := nodeGroupService.Belongs(ctx, &BelongsRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name, Node: toJSON(node)})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Belongs for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Belongs for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return false, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::Belongs got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::Belongs got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return false, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -339,7 +338,7 @@ func (ng *GrpcNodeGroup) Belongs(node *apiv1.Node) (bool, error) {
 }
 
 // DeleteNodes deletes the nodes from the group.
-func (ng *GrpcNodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
+func (ng *GrpcNodeGroup) DeleteNodes(nodes []*v1.Node) error {
 	manager := ng.GetManager()
 
 	manager.Lock()
@@ -354,11 +353,11 @@ func (ng *GrpcNodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 		r, err := nodeGroupService.DeleteNodes(ctx, &DeleteNodesRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name, Node: nodesAsJSON(nodes)})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::DeleteNodes for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::DeleteNodes for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::DeleteNodes got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::DeleteNodes got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -394,11 +393,11 @@ func (ng *GrpcNodeGroup) Nodes() ([]cloudprovider.Instance, error) {
 		r, err := nodeGroupService.Nodes(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::Nodes for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::Nodes for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::Nodes got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::Nodes got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -471,11 +470,11 @@ func (ng *GrpcNodeGroup) TemplateNodeInfo() (*schedulerframework.NodeInfo, error
 		r, err := nodeGroupService.TemplateNodeInfo(ctx, &NodeGroupServiceRequest{ProviderID: manager.GetCloudProviderID(), NodeGroupID: ng.name})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroup::TemplateNodeInfo for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::TemplateNodeInfo for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s:%s call NodeGroup::TemplateNodeInfo got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::TemplateNodeInfo got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}

@@ -18,16 +18,14 @@ package grpccloudprovider
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+	"k8s.io/klog/v2"
 )
-
-type server struct{}
 
 type testGrpcCloudProvider struct {
 	grpcCloudProvider
@@ -90,7 +88,7 @@ func testProviderWithEmbed(t *testing.T, timeout int, embedded bool) *testGrpcCl
 			manager:         manager,
 			resourceLimiter: resourceLimiter,
 			nodeGroups: []*NodeGroupDef{
-				&NodeGroupDef{
+				{
 					Provisionned:        false,
 					IncludeExistingNode: false,
 					NodeGroupID:         testGroupID,
@@ -145,7 +143,7 @@ func TestNodeGroups(t *testing.T) {
 
 		nodeGroups := provider.NodeGroups()
 
-		log.Printf("Called NodeGroups got: %v", nodeGroups)
+		klog.V(4).Infof("Called NodeGroups got: %v", nodeGroups)
 
 		if assert.True(t, len(nodeGroups) > 0) {
 			assert.Equal(t, nodeGroups[0].Id(), testGroupID)
@@ -172,7 +170,7 @@ func TestNodeGroupForNode(t *testing.T) {
 		if assert.NoError(t, err) {
 			if assert.NotNil(t, group) {
 
-				log.Printf("Called NodeGroupForNode got: %v", group)
+				klog.V(4).Infof("Called NodeGroupForNode got: %v", group)
 
 				assert.Equal(t, group.Id(), testGroupID)
 				assert.Equal(t, group.MinSize(), 0)
@@ -203,7 +201,7 @@ func TestPricing(t *testing.T) {
 	pricing, err := provider.Pricing()
 
 	if assert.NoError(t, err) {
-		log.Printf("Called Pricing got: %v", pricing)
+		klog.V(4).Infof("Called Pricing got: %v", pricing)
 
 		assert.Equal(t, pricing.(*GrpcPriceModel).name, testProviderID)
 	}
@@ -219,7 +217,7 @@ func TestGetAvailableMachineTypes(t *testing.T) {
 
 		if assert.NoError(t, err) {
 
-			log.Printf("Called GetAvailableMachineTypes got: %v", available)
+			klog.V(4).Infof("Called GetAvailableMachineTypes got: %v", available)
 
 			if assert.True(t, len(available) > 0) {
 				assert.Contains(t, []string{"tiny", "medium", "large", "extra-large"}, available[0])
@@ -243,7 +241,7 @@ func TestNewNodeGroup(t *testing.T) {
 		nodeGroup, err := provider.NewNodeGroup("medium", labels, systemLabels, nil, nil)
 
 		if assert.NoError(t, err) {
-			log.Printf("Called NewNodeGroup got: %v", nodeGroup)
+			klog.V(4).Infof("Called NewNodeGroup got: %v", nodeGroup)
 
 			assert.NotNil(t, nodeGroup)
 		}
@@ -260,7 +258,7 @@ func TestGetResourceLimiter(t *testing.T) {
 
 		if assert.NoError(t, err) {
 
-			log.Printf("Called GetResourceLimiter got: %v", rl)
+			klog.V(4).Infof("Called GetResourceLimiter got: %v", rl)
 
 			assert.NotNil(t, rl)
 		}
@@ -277,7 +275,7 @@ func TestGPULabel(t *testing.T) {
 
 		if assert.NotEmpty(t, label) {
 
-			log.Printf("Called GPULabel got: %v", label)
+			klog.V(4).Infof("Called GPULabel got: %v", label)
 
 			assert.Equal(t, label, "turing")
 		}
@@ -294,7 +292,7 @@ func TestGetAvailableGPUTypes(t *testing.T) {
 
 		if assert.NotNil(t, gpus) {
 
-			log.Printf("Called GetAvailableGPUTypes got: %v", gpus)
+			klog.V(4).Infof("Called GetAvailableGPUTypes got: %v", gpus)
 		}
 	}
 }

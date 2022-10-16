@@ -20,12 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"sync"
 	"time"
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
@@ -76,7 +76,7 @@ func (t *GrpcManager) isConnected() bool {
 // GetCloudProviderServiceClient return nodeGroupServiceClient
 func (t *GrpcManager) GetCloudProviderServiceClient() (CloudProviderServiceClient, error) {
 
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func (t *GrpcManager) GetCloudProviderServiceClient() (CloudProviderServiceClien
 
 // GetNodeGroupServiceClient return nodeGroupServiceClient
 func (t *GrpcManager) GetNodeGroupServiceClient() (NodeGroupServiceClient, error) {
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func (t *GrpcManager) GetNodeGroupServiceClient() (NodeGroupServiceClient, error
 
 // GetPricingModelServiceClient return pricingModelServiceClient
 func (t *GrpcManager) GetPricingModelServiceClient() (PricingModelServiceClient, error) {
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -132,11 +132,11 @@ func (t *GrpcManager) connect() error {
 	var reply *ConnectReply
 
 	// Set up a connection to the server.
-	options := grpc.WithInsecure()
+	options := grpc.WithTransportCredentials(insecure.NewCredentials())
 
 	t.connection, err = grpc.Dial(t.GetGrpcServerAddress(), options)
 	if err != nil {
-		log.Printf("did not connect to %s Error: %v", t.GetGrpcServerAddress(), err)
+		klog.Errorf("did not connect to %s Error: %v", t.GetGrpcServerAddress(), err)
 
 		return err
 	}
@@ -159,13 +159,13 @@ func (t *GrpcManager) connect() error {
 	})
 
 	if err != nil {
-		log.Printf("did not connect: %v", err)
+		klog.Errorf("did not connect: %v", err)
 	} else if reply.GetError() != nil {
 		err = errors.NewAutoscalerError(errors.CloudProviderError, reply.GetError().GetReason())
 
-		log.Printf("did not connect: %v", err)
-	} else if reply.GetConnected() == false {
-		log.Printf("Unable to connect")
+		klog.Errorf("did not connect: %v", err)
+	} else if !reply.GetConnected() {
+		klog.Errorf("Unable to connect")
 
 		err = errors.NewAutoscalerError(errors.CloudProviderError, "Unable to connect")
 	}
