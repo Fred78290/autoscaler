@@ -14,18 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 package grpccloudprovider
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -67,9 +64,9 @@ func (grpc *grpcCloudProvider) Cleanup() error {
 		r, err := cloudProviderService.Cleanup(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not cleanup cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not cleanup cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 		} else if r.Error != nil {
-			log.Printf("Cloud provider:%s cleanup return error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Cloud provider:%s cleanup return error: %v", manager.GetCloudProviderID(), err)
 		}
 
 		return grpc.GetManager().Close()
@@ -99,7 +96,7 @@ func (grpc *grpcCloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 		r, err := cloudProviderService.NodeGroups(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroupForNode for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get NodeGroupForNode for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 		} else {
 			var nodeGroups []cloudprovider.NodeGroup
 
@@ -118,7 +115,7 @@ func (grpc *grpcCloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 }
 
 // NodeGroupForNode returns the node group for the given node.
-func (grpc *grpcCloudProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
+func (grpc *grpcCloudProvider) NodeGroupForNode(node *v1.Node) (cloudprovider.NodeGroup, error) {
 	manager := grpc.GetManager()
 
 	manager.Lock()
@@ -133,15 +130,15 @@ func (grpc *grpcCloudProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider
 		r, err := cloudProviderService.NodeGroupForNode(ctx, &NodeGroupForNodeRequest{ProviderID: manager.GetCloudProviderID(), Node: toJSON(node)})
 
 		if err != nil {
-			log.Printf("Could not get NodeGroupForNode for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get NodeGroupForNode for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call NodeGroupForNode got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call NodeGroupForNode got error: %v", manager.GetCloudProviderID(), rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		} else if r.GetNodeGroup() == nil || len(r.GetNodeGroup().GetId()) == 0 {
-			log.Printf("NodeGroup for node:%s not found", node.Spec.ProviderID)
+			klog.Errorf("NodeGroup for node:%s not found", node.Spec.ProviderID)
 			return nil, nil
 		}
 
@@ -170,11 +167,11 @@ func (grpc *grpcCloudProvider) Pricing() (cloudprovider.PricingModel, errors.Aut
 		r, err := cloudProviderService.Pricing(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get Pricing for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get Pricing for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return nil, errors.ToAutoscalerError(errors.InternalError, err)
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call Pricing got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call Pricing got error: %v", manager.GetCloudProviderID(), rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -204,11 +201,11 @@ func (grpc *grpcCloudProvider) GetAvailableMachineTypes() ([]string, error) {
 		r, err := cloudProviderService.GetAvailableMachineTypes(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get GetAvailableMachineTypes for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get GetAvailableMachineTypes for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call GetAvailableMachineTypes got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call GetAvailableMachineTypes got error: %v", manager.GetCloudProviderID(), rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -222,7 +219,7 @@ func (grpc *grpcCloudProvider) GetAvailableMachineTypes() ([]string, error) {
 // NewNodeGroup builds a theoretical node group based on the node definition provided. The node group is not automatically
 // created on the cloud provider side. The node group is not returned by NodeGroups() until it is created.
 func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[string]string, systemLabels map[string]string,
-	taints []apiv1.Taint, extraResources map[string]resource.Quantity) (cloudprovider.NodeGroup, error) {
+	taints []v1.Taint, extraResources map[string]resource.Quantity) (cloudprovider.NodeGroup, error) {
 
 	manager := grpc.GetManager()
 
@@ -244,7 +241,7 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 
 	var extraResourcesRequest map[string]string
 
-	if extraResources != nil && len(extraResources) > 0 {
+	if len(extraResources) > 0 {
 		extraResourcesRequest = make(map[string]string)
 
 		for key, value := range extraResources {
@@ -257,7 +254,7 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 	if err == nil {
 		for index, ng := range grpc.nodeGroups {
 			// Find a group not already provisionned
-			if ng.Provisionned == false {
+			if !ng.Provisionned {
 				r, err := cloudProviderService.NewNodeGroup(ctx, &NewNodeGroupRequest{
 					ProviderID:     manager.GetCloudProviderID(),
 					MachineType:    machineType,
@@ -271,11 +268,11 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 				})
 
 				if err != nil {
-					log.Printf("Could not get NewNodeGroup for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+					klog.Errorf("Could not get NewNodeGroup for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 					return nil, err
 				} else if rerr := r.GetError(); rerr != nil {
-					log.Printf("Cloud provider:%s call NewNodeGroup got error: %v", manager.GetCloudProviderID(), rerr)
+					klog.Errorf("Cloud provider:%s call NewNodeGroup got error: %v", manager.GetCloudProviderID(), rerr)
 
 					return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 				}
@@ -288,7 +285,7 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 				}, nil
 			}
 
-			log.Printf("All nodes group altready provisionned")
+			klog.Infoln("All nodes group already provisionned")
 
 			err = errors.NewAutoscalerError(errors.InternalError, "All node group already provisionned")
 		}
@@ -314,11 +311,11 @@ func (grpc *grpcCloudProvider) GetResourceLimiter() (*cloudprovider.ResourceLimi
 		r, err := cloudProviderService.GetResourceLimiter(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get GetResourceLimiter for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get GetResourceLimiter for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call GetResourceLimiter got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call GetResourceLimiter got error: %v", manager.GetCloudProviderID(), rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -347,7 +344,7 @@ func (grpc *grpcCloudProvider) GPULabel() string {
 		r, err := cloudProviderService.GPULabel(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get GPULabel for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get GPULabel for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return ""
 		}
@@ -374,7 +371,7 @@ func (grpc *grpcCloudProvider) GetAvailableGPUTypes() map[string]struct{} {
 		r, err := cloudProviderService.GetAvailableGPUTypes(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get GetAvailableGPUTypes for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get GetAvailableGPUTypes for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return nil
 		}
@@ -408,11 +405,11 @@ func (grpc *grpcCloudProvider) Refresh() error {
 		r, err := cloudProviderService.Refresh(ctx, &CloudProviderServiceRequest{ProviderID: manager.GetCloudProviderID()})
 
 		if err != nil {
-			log.Printf("Could not get Refresh for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get Refresh for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call Refresh got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call Refresh got error: %v", manager.GetCloudProviderID(), rerr)
 
 			return errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
@@ -463,7 +460,7 @@ func parseNodeGroupDefs(nodeGroupDefs []string) ([]*NodeGroupDef, error) {
 				values := strings.Split(labels[i], "=")
 
 				if len(values) != 2 {
-					return nil, fmt.Errorf("Misformatted label definition: %s extracted from:%s", tailStr, labels[i])
+					return nil, fmt.Errorf("misformatted label definition: %s extracted from:%s", tailStr, labels[i])
 				}
 
 				ng.Labels[values[0]] = values[1]

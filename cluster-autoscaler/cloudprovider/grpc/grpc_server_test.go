@@ -19,7 +19,6 @@ package grpccloudprovider
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 
@@ -27,6 +26,7 @@ import (
 	"google.golang.org/grpc/reflection"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+	klog "k8s.io/klog/v2"
 )
 
 const serverProviderIdentifier = "multipass"
@@ -41,7 +41,6 @@ type grpcServer struct {
 	nodeGroupID     string
 	minNodeSize     int32
 	maxNodeSize     int32
-	wg              sync.WaitGroup
 }
 
 var testServer *grpc.Server
@@ -60,7 +59,7 @@ func providerIDForNode(groupID, nodeName string) string {
 }
 
 func (s *grpcServer) Connect(ctx context.Context, request *ConnectRequest) (*ConnectReply, error) {
-	log.Printf("Call server Connect: %v", request)
+	klog.V(4).Infof("Call server Connect: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -77,7 +76,7 @@ func (s *grpcServer) Connect(ctx context.Context, request *ConnectRequest) (*Con
 }
 
 func (s *grpcServer) Name(ctx context.Context, request *CloudProviderServiceRequest) (*NameReply, error) {
-	log.Printf("Call server Name: %v", request)
+	klog.V(4).Infof("Call server Name: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -89,7 +88,7 @@ func (s *grpcServer) Name(ctx context.Context, request *CloudProviderServiceRequ
 }
 
 func (s *grpcServer) NodeGroups(ctx context.Context, request *CloudProviderServiceRequest) (*NodeGroupsReply, error) {
-	log.Printf("Call server NodeGroups: %v", request)
+	klog.V(4).Infof("Call server NodeGroups: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -97,7 +96,7 @@ func (s *grpcServer) NodeGroups(ctx context.Context, request *CloudProviderServi
 
 	return &NodeGroupsReply{
 		NodeGroups: []*NodeGroup{
-			&NodeGroup{
+			{
 				Id: s.nodeGroupID,
 			},
 		},
@@ -105,7 +104,7 @@ func (s *grpcServer) NodeGroups(ctx context.Context, request *CloudProviderServi
 }
 
 func (s *grpcServer) NodeGroupForNode(ctx context.Context, request *NodeGroupForNodeRequest) (*NodeGroupForNodeReply, error) {
-	log.Printf("Call server NodeGroupForNode: %v", request)
+	klog.V(4).Infof("Call server NodeGroupForNode: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -140,7 +139,7 @@ func (s *grpcServer) NodeGroupForNode(ctx context.Context, request *NodeGroupFor
 }
 
 func (s *grpcServer) Pricing(ctx context.Context, request *CloudProviderServiceRequest) (*PricingModelReply, error) {
-	log.Printf("Call server Pricing: %v", request)
+	klog.V(4).Infof("Call server Pricing: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -156,7 +155,7 @@ func (s *grpcServer) Pricing(ctx context.Context, request *CloudProviderServiceR
 }
 
 func (s *grpcServer) GetAvailableMachineTypes(ctx context.Context, request *CloudProviderServiceRequest) (*AvailableMachineTypesReply, error) {
-	log.Printf("Call server GetAvailableMachineTypes: %v", request)
+	klog.V(4).Infof("Call server GetAvailableMachineTypes: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -172,7 +171,7 @@ func (s *grpcServer) GetAvailableMachineTypes(ctx context.Context, request *Clou
 }
 
 func (s *grpcServer) NewNodeGroup(ctx context.Context, request *NewNodeGroupRequest) (*NewNodeGroupReply, error) {
-	log.Printf("Call server NewNodeGroup: %v", request)
+	klog.V(4).Infof("Call server NewNodeGroup: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -203,7 +202,7 @@ func (s *grpcServer) NewNodeGroup(ctx context.Context, request *NewNodeGroupRequ
 }
 
 func (s *grpcServer) GetResourceLimiter(ctx context.Context, request *CloudProviderServiceRequest) (*ResourceLimiterReply, error) {
-	log.Printf("Call server GetResourceLimiter: %v", request)
+	klog.V(4).Infof("Call server GetResourceLimiter: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -220,7 +219,7 @@ func (s *grpcServer) GetResourceLimiter(ctx context.Context, request *CloudProvi
 }
 
 func (s *grpcServer) GPULabel(ctx context.Context, request *CloudProviderServiceRequest) (*GPULabelReply, error) {
-	log.Printf("Call server GPULabel: %v", request)
+	klog.V(4).Infof("Call server GPULabel: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -234,7 +233,7 @@ func (s *grpcServer) GPULabel(ctx context.Context, request *CloudProviderService
 }
 
 func (s *grpcServer) GetAvailableGPUTypes(ctx context.Context, request *CloudProviderServiceRequest) (*GetAvailableGPUTypesReply, error) {
-	log.Printf("Call server GPULabel: %v", request)
+	klog.V(4).Infof("Call server GPULabel: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -252,7 +251,7 @@ func (s *grpcServer) GetAvailableGPUTypes(ctx context.Context, request *CloudPro
 }
 
 func (s *grpcServer) Cleanup(ctx context.Context, request *CloudProviderServiceRequest) (*CleanupReply, error) {
-	log.Printf("Call server Cleanup: %v", request)
+	klog.V(4).Infof("Call server Cleanup: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -264,7 +263,7 @@ func (s *grpcServer) Cleanup(ctx context.Context, request *CloudProviderServiceR
 }
 
 func (s *grpcServer) Refresh(ctx context.Context, request *CloudProviderServiceRequest) (*RefreshReply, error) {
-	log.Printf("Call server Refresh: %v", request)
+	klog.V(4).Infof("Call server Refresh: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -276,7 +275,7 @@ func (s *grpcServer) Refresh(ctx context.Context, request *CloudProviderServiceR
 }
 
 func (s *grpcServer) MaxSize(ctx context.Context, request *NodeGroupServiceRequest) (*MaxSizeReply, error) {
-	log.Printf("Call server MaxSize: %v", request)
+	klog.V(4).Infof("Call server MaxSize: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -288,7 +287,7 @@ func (s *grpcServer) MaxSize(ctx context.Context, request *NodeGroupServiceReque
 }
 
 func (s *grpcServer) MinSize(ctx context.Context, request *NodeGroupServiceRequest) (*MinSizeReply, error) {
-	log.Printf("Call server MinSize: %v", request)
+	klog.V(4).Infof("Call server MinSize: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -300,7 +299,7 @@ func (s *grpcServer) MinSize(ctx context.Context, request *NodeGroupServiceReque
 }
 
 func (s *grpcServer) TargetSize(ctx context.Context, request *NodeGroupServiceRequest) (*TargetSizeReply, error) {
-	log.Printf("Call server TargetSize: %v", request)
+	klog.V(4).Infof("Call server TargetSize: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -314,7 +313,7 @@ func (s *grpcServer) TargetSize(ctx context.Context, request *NodeGroupServiceRe
 }
 
 func (s *grpcServer) IncreaseSize(ctx context.Context, request *IncreaseSizeRequest) (*IncreaseSizeReply, error) {
-	log.Printf("Call server IncreaseSize: %v", request)
+	klog.V(4).Infof("Call server IncreaseSize: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -326,7 +325,7 @@ func (s *grpcServer) IncreaseSize(ctx context.Context, request *IncreaseSizeRequ
 }
 
 func (s *grpcServer) DeleteNodes(ctx context.Context, request *DeleteNodesRequest) (*DeleteNodesReply, error) {
-	log.Printf("Call server DeleteNodes: %v", request)
+	klog.V(4).Infof("Call server DeleteNodes: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -338,7 +337,7 @@ func (s *grpcServer) DeleteNodes(ctx context.Context, request *DeleteNodesReques
 }
 
 func (s *grpcServer) DecreaseTargetSize(ctx context.Context, request *DecreaseTargetSizeRequest) (*DecreaseTargetSizeReply, error) {
-	log.Printf("Call server DecreaseTargetSize: %v", request)
+	klog.V(4).Infof("Call server DecreaseTargetSize: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -350,7 +349,7 @@ func (s *grpcServer) DecreaseTargetSize(ctx context.Context, request *DecreaseTa
 }
 
 func (s *grpcServer) Id(ctx context.Context, request *NodeGroupServiceRequest) (*IdReply, error) {
-	log.Printf("Call server Id: %v", request)
+	klog.V(4).Infof("Call server Id: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -362,7 +361,7 @@ func (s *grpcServer) Id(ctx context.Context, request *NodeGroupServiceRequest) (
 }
 
 func (s *grpcServer) Debug(ctx context.Context, request *NodeGroupServiceRequest) (*DebugReply, error) {
-	log.Printf("Call server Debug: %v", request)
+	klog.V(4).Infof("Call server Debug: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -374,7 +373,7 @@ func (s *grpcServer) Debug(ctx context.Context, request *NodeGroupServiceRequest
 }
 
 func (s *grpcServer) Nodes(ctx context.Context, request *NodeGroupServiceRequest) (*NodesReply, error) {
-	log.Printf("Call server Nodes: %v", request)
+	klog.V(4).Infof("Call server Nodes: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -398,7 +397,7 @@ func (s *grpcServer) Nodes(ctx context.Context, request *NodeGroupServiceRequest
 }
 
 func (s *grpcServer) TemplateNodeInfo(ctx context.Context, request *NodeGroupServiceRequest) (*TemplateNodeInfoReply, error) {
-	log.Printf("Call server TemplateNodeInfo: %v", request)
+	klog.V(4).Infof("Call server TemplateNodeInfo: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -418,7 +417,7 @@ func (s *grpcServer) TemplateNodeInfo(ctx context.Context, request *NodeGroupSer
 }
 
 func (s *grpcServer) Exist(ctx context.Context, request *NodeGroupServiceRequest) (*ExistReply, error) {
-	log.Printf("Call server Exist: %v", request)
+	klog.V(4).Infof("Call server Exist: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -431,7 +430,7 @@ func (s *grpcServer) Exist(ctx context.Context, request *NodeGroupServiceRequest
 }
 
 func (s *grpcServer) Create(ctx context.Context, request *NodeGroupServiceRequest) (*CreateReply, error) {
-	log.Printf("Call server Create: %v", request)
+	klog.V(4).Infof("Call server Create: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -447,7 +446,7 @@ func (s *grpcServer) Create(ctx context.Context, request *NodeGroupServiceReques
 }
 
 func (s *grpcServer) Delete(ctx context.Context, request *NodeGroupServiceRequest) (*DeleteReply, error) {
-	log.Printf("Call server Delete: %v", request)
+	klog.V(4).Infof("Call server Delete: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -459,7 +458,7 @@ func (s *grpcServer) Delete(ctx context.Context, request *NodeGroupServiceReques
 }
 
 func (s *grpcServer) Autoprovisioned(ctx context.Context, request *NodeGroupServiceRequest) (*AutoprovisionedReply, error) {
-	log.Printf("Call server Autoprovisioned: %v", request)
+	klog.V(4).Infof("Call server Autoprovisioned: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -471,7 +470,7 @@ func (s *grpcServer) Autoprovisioned(ctx context.Context, request *NodeGroupServ
 }
 
 func (s *grpcServer) Belongs(ctx context.Context, request *BelongsRequest) (*BelongsReply, error) {
-	log.Printf("Call server Belongs: %v", request)
+	klog.V(4).Infof("Call server Belongs: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -498,7 +497,7 @@ func (s *grpcServer) Belongs(ctx context.Context, request *BelongsRequest) (*Bel
 }
 
 func (s *grpcServer) NodePrice(ctx context.Context, request *NodePriceRequest) (*NodePriceReply, error) {
-	log.Printf("Call server NodePrice: %v", request)
+	klog.V(4).Infof("Call server NodePrice: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -512,7 +511,7 @@ func (s *grpcServer) NodePrice(ctx context.Context, request *NodePriceRequest) (
 }
 
 func (s *grpcServer) PodPrice(ctx context.Context, request *PodPriceRequest) (*PodPriceReply, error) {
-	log.Printf("Call server PodPrice: %v", request)
+	klog.V(4).Infof("Call server PodPrice: %v", request)
 
 	if request.GetProviderID() != serverProviderIdentifier {
 		return nil, ErrMismatchingProvider
@@ -550,18 +549,18 @@ func (s *grpcServer) PodPrice(ctx context.Context, request *PodPriceRequest) (*P
 }
 
 func stopTestServer() {
-	log.Printf("Stop listening test server")
+	klog.V(4).Infof("Stop listening test server")
 
 	testServer.GracefulStop()
 }
 
 func startTestServer(wg *sync.WaitGroup) {
-	log.Printf("Start listening test server")
+	klog.V(4).Infof("Start listening test server")
 
 	lis, err := net.Listen("unix", "/tmp/cluster-autoscaler-grpc.sock")
 
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		klog.Fatalf("failed to listen: %v", err)
 	}
 
 	testServer = grpc.NewServer()
@@ -575,8 +574,8 @@ func startTestServer(wg *sync.WaitGroup) {
 	wg.Done()
 
 	if err := testServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		klog.Fatalf("failed to serve: %v", err)
 	}
 
-	log.Printf("End listening test server")
+	klog.V(4).Infof("End listening test server")
 }

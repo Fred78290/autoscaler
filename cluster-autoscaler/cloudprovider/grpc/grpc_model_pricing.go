@@ -18,11 +18,11 @@ package grpccloudprovider
 
 import (
 	"context"
-	"log"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	errors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
+	klog "k8s.io/klog/v2"
 )
 
 // GrpcPriceModel implements PriceModel interface for GCE.
@@ -48,11 +48,11 @@ func (model *GrpcPriceModel) NodePrice(node *apiv1.Node, startTime time.Time, en
 		r, err := pricingModelService.NodePrice(ctx, &NodePriceRequest{ProviderID: manager.GetCloudProviderID(), Node: toJSON(node), StartTime: startTime.Unix(), EndTime: endTime.Unix()})
 
 		if err != nil {
-			log.Printf("Could not get PriceModel::NodePrice for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get PriceModel::NodePrice for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return 0, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call PriceModel::NodePrice got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call PriceModel::NodePrice got error: %v", manager.GetCloudProviderID(), rerr)
 			return 0, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
 
@@ -79,11 +79,11 @@ func (model *GrpcPriceModel) PodPrice(pod *apiv1.Pod, startTime time.Time, endTi
 		r, err := pricingModelService.PodPrice(ctx, &PodPriceRequest{ProviderID: manager.GetCloudProviderID(), Pod: toJSON(pod), StartTime: startTime.Unix(), EndTime: endTime.Unix()})
 
 		if err != nil {
-			log.Printf("Could not get PriceModel::PodPrice for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+			klog.Errorf("Could not get PriceModel::PodPrice for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
 
 			return 0, err
 		} else if rerr := r.GetError(); rerr != nil {
-			log.Printf("Cloud provider:%s call PriceModel::PodPrice got error: %v", manager.GetCloudProviderID(), rerr)
+			klog.Errorf("Cloud provider:%s call PriceModel::PodPrice got error: %v", manager.GetCloudProviderID(), rerr)
 			return 0, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
 
