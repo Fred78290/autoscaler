@@ -18,6 +18,7 @@
   - [Keeping limit proportional to request](#keeping-limit-proportional-to-request)
   - [Capping to Limit Range](#capping-to-limit-range)
   - [Resource Policy Overriding Limit Range](#resource-policy-overriding-limit-range)
+  - [Starting multiple recommenders](#starting-multiple-recommenders)
 - [Known limitations](#known-limitations)
 - [Related links](#related-links)
 
@@ -45,13 +46,14 @@ procedure described below.
 
 # Installation
 
-The current default version is Vertical Pod Autoscaler 0.11.0
+The current default version is Vertical Pod Autoscaler 0.12.0
 
 ### Compatibility
 
 | VPA version     | Kubernetes version |
 |-----------------|--------------------|
-| 0.11            | 1.22+              |
+| 0.12            | 1.25+              |
+| 0.11            | 1.22 - 1.24        |
 | 0.10            | 1.22+              |
 | 0.9             | 1.16+              |
 | 0.8             | 1.13+              |
@@ -279,6 +281,20 @@ VPAs Container Resource Policy requires VPA to set containers request to at leas
 2 GB RAM. VPA recommendation is 1000 milli CPU and 2 GB of RAM. When applying the recommendation,
 VPA will set RAM request to 2 GB (following the resource policy) and RAM limit to 4 GB (to maintain
 the 2:1 limit/request ratio from the template).
+
+### Starting multiple recommenders
+
+It is possible to start one or more extra recommenders in order to use different percentile on different workload profiles.
+For example you could have 3 profiles: [frugal](deploy/recommender-deployment-low.yaml),
+[standard](deploy/recommender-deployment.yaml) and
+[performance](deploy/recommender-deployment-high.yaml) which will
+use different TargetCPUPercentile (50, 90 and 95) to calculate their recommendations.
+
+Please note the usage of the following arguments to override default names and percentiles:
+- --name=performance
+- --target-cpu-percentile=0.95
+
+You can then choose which recommender to use by setting `recommenders` inside the `VerticalPodAutoscaler` spec.
 
 # Known limitations
 
