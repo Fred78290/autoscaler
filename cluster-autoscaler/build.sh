@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-sudo rm -rf out
+sudo rm -rf out vendor
 
-VERSION=v1.25.2
+VERSION=v1.25.3
 REGISTRY=fred78290
 
 make -e REGISTRY=$REGISTRY -e TAG=$VERSION -e DOCKER_RM=1 container -e GOARCH=amd64
