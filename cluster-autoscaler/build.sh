@@ -15,4 +15,4 @@
 # limitations under the License.
 
 sudo rm -rf out
-make -e REGISTRY=fred78290 -e TAG=v1.26.0-alpha.0 container
+make -e REGISTRY=fred78290 -e TAG=v1.26.0 container
