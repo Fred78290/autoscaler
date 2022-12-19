@@ -27,7 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/unremovable"
 	. "k8s.io/autoscaler/cluster-autoscaler/core/test"
-	"k8s.io/autoscaler/cluster-autoscaler/simulator"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/deletetaint"
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
 
@@ -104,12 +104,12 @@ func TestFilterOutUnremovable(t *testing.T) {
 				provider.AddNode("ng1", n)
 			}
 			context, err := NewScaleTestAutoscalingContext(options, &fake.Clientset{}, nil, provider, nil, nil)
-			simulator.InitializeClusterSnapshotOrDie(t, context.ClusterSnapshot, tc.nodes, tc.pods)
+			clustersnapshot.InitializeClusterSnapshotOrDie(t, context.ClusterSnapshot, tc.nodes, tc.pods)
 			if err != nil {
 				t.Fatalf("Could not create autoscaling context: %v", err)
 			}
 			unremovableNodes := unremovable.NewNodes()
-			got, _ := c.FilterOutUnremovable(&context, tc.nodes, now, unremovableNodes)
+			got, _, _ := c.FilterOutUnremovable(&context, tc.nodes, now, unremovableNodes)
 			assert.Equal(t, tc.want, got)
 		})
 	}
