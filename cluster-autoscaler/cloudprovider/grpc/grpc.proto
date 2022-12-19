@@ -6,8 +6,8 @@ option java_outer_classname = "CloudProviderGrpc";
 
 package grpccloudprovider;
 
-import "google/protobuf/struct.proto";
-import "google/protobuf/any.proto";
+//import "google/protobuf/struct.proto";
+//import "google/protobuf/any.proto";
 import "k8s.io/api/core/v1/generated.proto";
 //import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 //import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
@@ -28,6 +28,7 @@ service CloudProviderService {
     rpc GetAvailableGPUTypes (CloudProviderServiceRequest) returns (GetAvailableGPUTypesReply) {}
     rpc Cleanup (CloudProviderServiceRequest) returns (CleanupReply) {}
     rpc Refresh (CloudProviderServiceRequest) returns (RefreshReply) {}
+	rpc HasInstance(HasInstanceRequest) returns (HasInstanceReply) {}
 }
 
 message CloudProviderServiceRequest {
@@ -407,4 +408,16 @@ message InstanceStatus {
 message Instance {
     string id = 1;
     InstanceStatus status = 2;
+}
+
+message HasInstanceRequest {
+    string providerID = 1;
+    string node = 2;
+}
+
+message HasInstanceReply {
+    oneof response {
+        Error error = 1;
+        bool hasInstance = 2;
+    }
 }

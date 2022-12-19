@@ -159,6 +159,37 @@ func (grpc *grpcCloudProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider
 }
 
 // Pricing returns pricing model for this cloud provider or error if not available.
+func (grpc *grpcCloudProvider) HasInstance(node *apiv1.Node) (bool, error) {
+	manager := grpc.GetManager()
+
+	manager.Lock()
+	defer manager.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), manager.GetGrpcTimeout())
+	defer cancel()
+
+	cloudProviderService, err := manager.GetCloudProviderServiceClient()
+
+	if err == nil {
+		r, err := cloudProviderService.HasInstance(ctx, &HasInstanceRequest{ProviderID: manager.GetCloudProviderID(), Node: toJSON(node)})
+
+		if err != nil {
+			log.Printf("HasInstance failed for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+
+			return false, errors.ToAutoscalerError(errors.InternalError, err)
+		} else if rerr := r.GetError(); rerr != nil {
+			log.Printf("Cloud provider:%s call HasInstance got error: %v", manager.GetCloudProviderID(), rerr)
+
+			return false, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
+		}
+
+		return r.GetHasInstance(), nil
+	}
+
+	return false, errors.NewAutoscalerError(errors.ApiCallError, err.Error())
+}
+
+// Pricing returns pricing model for this cloud provider or error if not available.
 func (grpc *grpcCloudProvider) Pricing() (cloudprovider.PricingModel, errors.AutoscalerError) {
 	manager := grpc.GetManager()
 
