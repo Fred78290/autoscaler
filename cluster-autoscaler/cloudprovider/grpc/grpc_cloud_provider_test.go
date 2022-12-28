@@ -194,6 +194,27 @@ func TestNodeGroupForNode(t *testing.T) {
 	}
 }
 
+func TestHasInstance(t *testing.T) {
+	provider := testProvider(t)
+	defer provider.Cleanup()
+
+	node := &apiv1.Node{
+		Spec: apiv1.NodeSpec{
+			ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, testGroupID, testNodeName),
+		},
+	}
+
+	assert.NoError(t, provider.Refresh())
+
+	hasinstance, err := provider.HasInstance(node)
+
+	if assert.NoError(t, err) {
+		log.Printf("Called Hasinstance got: %v", hasinstance)
+
+		assert.True(t, hasinstance)
+	}
+}
+
 func TestPricing(t *testing.T) {
 	provider := testProvider(t)
 	defer provider.Cleanup()

@@ -138,6 +138,20 @@ func (s *grpcServer) NodeGroupForNode(ctx context.Context, request *NodeGroupFor
 	}, nil
 }
 
+func (s *grpcServer) HasInstance(ctx context.Context, request *HasInstanceRequest) (*HasInstanceReply, error) {
+	log.Printf("Call server Pricing: %v", request)
+
+	if request.GetProviderID() != serverProviderIdentifier {
+		return nil, ErrMismatchingProvider
+	}
+
+	return &HasInstanceReply{
+		Response: &HasInstanceReply_HasInstance{
+			HasInstance: true,
+		},
+	}, nil
+}
+
 func (s *grpcServer) Pricing(ctx context.Context, request *CloudProviderServiceRequest) (*PricingModelReply, error) {
 	log.Printf("Call server Pricing: %v", request)
 
