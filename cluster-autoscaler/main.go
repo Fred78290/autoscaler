@@ -91,6 +91,8 @@ var (
 	address                 = flag.String("address", ":8085", "The address to expose prometheus metrics.")
 	kubernetes              = flag.String("kubernetes", "", "Kubernetes master location. Leave blank for default")
 	kubeConfigFile          = flag.String("kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
+	kubeClientBurst         = flag.Int("kube-client-burst", rest.DefaultBurst, "Burst value for kubernetes client.")
+	kubeClientQPS           = flag.Float64("kube-client-qps", float64(rest.DefaultQPS), "QPS value for kubernetes client.")
 	cloudConfig             = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	namespace               = flag.String("namespace", "kube-system", "Namespace in which cluster-autoscaler run.")
 	enforceNodeGroupMinSize = flag.Bool("enforce-node-group-min-size", false, "Should CA scale up the node group to the configured min size if needed.")
@@ -214,6 +216,9 @@ var (
 	nodeDeleteDelayAfterTaint          = flag.Duration("node-delete-delay-after-taint", 5*time.Second, "How long to wait before deleting a node after tainting it")
 	scaleDownSimulationTimeout         = flag.Duration("scale-down-simulation-timeout", 5*time.Minute, "How long should we run scale down simulation.")
 	parallelDrain                      = flag.Bool("parallel-drain", false, "Whether to allow parallel drain of nodes.")
+	maxCapacityMemoryDifferenceRatio   = flag.Float64("memory-difference-ratio", config.DefaultMaxCapacityMemoryDifferenceRatio, "Maximum difference in memory capacity between two similar node groups to be considered for balancing. Value is a ratio of the smaller node group's memory capacity.")
+	maxFreeDifferenceRatio             = flag.Float64("max-free-difference-ratio", config.DefaultMaxFreeDifferenceRatio, "Maximum difference in free resources between two similar node groups to be considered for balancing. Value is a ratio of the smaller node group's free resource.")
+	maxAllocatableDifferenceRatio      = flag.Float64("max-allocatable-difference-ratio", config.DefaultMaxAllocatableDifferenceRatio, "Maximum difference in allocatable resources between two similar node groups to be considered for balancing. Value is a ratio of the smaller node group's allocatable resource.")
 )
 
 func createAutoscalingOptions() config.AutoscalingOptions {
@@ -291,6 +296,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		BalancingExtraIgnoredLabels:        *balancingIgnoreLabelsFlag,
 		BalancingLabels:                    *balancingLabelsFlag,
 		KubeConfigPath:                     *kubeConfigFile,
+		KubeClientBurst:                    *kubeClientBurst,
+		KubeClientQPS:                      *kubeClientQPS,
 		NodeDeletionDelayTimeout:           *nodeDeletionDelayTimeout,
 		AWSUseStaticInstanceList:           *awsUseStaticInstanceList,
 		ConcurrentGceRefreshes:             *concurrentGceRefreshes,
@@ -315,6 +322,11 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		NodeDeleteDelayAfterTaint:          *nodeDeleteDelayAfterTaint,
 		ScaleDownSimulationTimeout:         *scaleDownSimulationTimeout,
 		ParallelDrain:                      *parallelDrain,
+		NodeGroupSetRatios: config.NodeGroupDifferenceRatios{
+			MaxCapacityMemoryDifferenceRatio: *maxCapacityMemoryDifferenceRatio,
+			MaxAllocatableDifferenceRatio:    *maxAllocatableDifferenceRatio,
+			MaxFreeDifferenceRatio:           *maxFreeDifferenceRatio,
+		},
 	}
 }
 
@@ -363,7 +375,12 @@ func registerSignalHandlers(autoscaler core.Autoscaler) {
 func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter) (core.Autoscaler, error) {
 	// Create basic config from flags.
 	autoscalingOptions := createAutoscalingOptions()
-	kubeClient := createKubeClient(getKubeConfig())
+
+	kubeClientConfig := getKubeConfig()
+	kubeClientConfig.Burst = autoscalingOptions.KubeClientBurst
+	kubeClientConfig.QPS = float32(autoscalingOptions.KubeClientQPS)
+	kubeClient := createKubeClient(kubeClientConfig)
+
 	eventsKubeClient := createKubeClient(getKubeConfig())
 
 	predicateChecker, err := predicatechecker.NewSchedulerBasedPredicateChecker(kubeClient, make(chan struct{}))
@@ -402,7 +419,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		} else if autoscalingOptions.CloudProviderName == cloudprovider.ClusterAPIProviderName {
 			nodeInfoComparatorBuilder = nodegroupset.CreateClusterAPINodeInfoComparator
 		}
-		nodeInfoComparator = nodeInfoComparatorBuilder(autoscalingOptions.BalancingExtraIgnoredLabels)
+		nodeInfoComparator = nodeInfoComparatorBuilder(autoscalingOptions.BalancingExtraIgnoredLabels, autoscalingOptions.NodeGroupSetRatios)
 	}
 
 	opts.Processors.NodeGroupSetProcessor = &nodegroupset.BalancingNodeGroupSetProcessor{
