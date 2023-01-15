@@ -21,8 +21,8 @@ import (
 	fmt "fmt"
 	"log"
 
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	errors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
@@ -308,7 +308,7 @@ func (ng *GrpcNodeGroup) DecreaseTargetSize(delta int) error {
 }
 
 // Belongs returns true if the given node belongs to the NodeGroup.
-func (ng *GrpcNodeGroup) Belongs(node *apiv1.Node) (bool, error) {
+func (ng *GrpcNodeGroup) Belongs(node *v1.Node) (bool, error) {
 	manager := ng.GetManager()
 
 	manager.Lock()
@@ -339,7 +339,7 @@ func (ng *GrpcNodeGroup) Belongs(node *apiv1.Node) (bool, error) {
 }
 
 // DeleteNodes deletes the nodes from the group.
-func (ng *GrpcNodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
+func (ng *GrpcNodeGroup) DeleteNodes(nodes []*v1.Node) error {
 	manager := ng.GetManager()
 
 	manager.Lock()
@@ -436,25 +436,6 @@ func (ng *GrpcNodeGroup) Nodes() ([]cloudprovider.Instance, error) {
 	return instances, err
 }
 
-func newNodeInfoResource(resource *Resource) *schedulerframework.Resource {
-	res := &schedulerframework.Resource{}
-
-	res.MilliCPU = resource.MilliCPU
-	res.Memory = resource.Memory
-	res.EphemeralStorage = resource.EphemeralStorage
-	res.AllowedPodNumber = int(resource.AllowedPodNumber)
-
-	if resource.ScalarResources != nil {
-		res.ScalarResources = make(map[v1.ResourceName]int64, len(resource.ScalarResources))
-
-		for n, r := range resource.ScalarResources {
-			res.ScalarResources[v1.ResourceName(n)] = r
-		}
-	}
-
-	return res
-}
-
 // TemplateNodeInfo returns a node template for this node group.
 func (ng *GrpcNodeGroup) TemplateNodeInfo() (*schedulerframework.NodeInfo, error) {
 	manager := ng.GetManager()
@@ -489,7 +470,61 @@ func (ng *GrpcNodeGroup) TemplateNodeInfo() (*schedulerframework.NodeInfo, error
 // GetOptions returns NodeGroupAutoscalingOptions that should be used for this particular
 // NodeGroup. Returning a nil will result in using default options.
 func (ng *GrpcNodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions) (*config.NodeGroupAutoscalingOptions, error) {
-	return nil, cloudprovider.ErrNotImplemented
+	manager := ng.GetManager()
+
+	manager.Lock()
+	defer manager.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), manager.GetGrpcTimeout())
+	defer cancel()
+
+	nodeGroupService, err := manager.GetNodeGroupServiceClient()
+
+	if err == nil {
+		request := &GetOptionsRequest{
+			ProviderID:  manager.GetCloudProviderID(),
+			NodeGroupID: ng.name,
+			Defaults: &AutoscalingOptions{
+				ScaleDownUtilizationThreshold:    defaults.ScaleDownUtilizationThreshold,
+				ScaleDownGpuUtilizationThreshold: defaults.ScaleDownGpuUtilizationThreshold,
+				ScaleDownUnneededTime: &metav1.Duration{
+					Duration: defaults.ScaleDownUnneededTime,
+				},
+				ScaleDownUnreadyTime: &metav1.Duration{
+					Duration: defaults.ScaleDownUnreadyTime,
+				},
+			},
+		}
+
+		r, err := nodeGroupService.GetOptions(ctx, request)
+
+		if err != nil {
+			log.Printf("Could not get NodeGroup::GetOptions for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+
+			return nil, err
+		} else if rerr := r.GetError(); rerr != nil {
+			log.Printf("Cloud provider:%s:%s call NodeGroup::GetOptions got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+
+			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
+		}
+
+		pbOpts := r.GetNodeGroupAutoscalingOptions()
+
+		if pbOpts == nil {
+			return nil, nil
+		}
+
+		opts := &config.NodeGroupAutoscalingOptions{
+			ScaleDownUtilizationThreshold:    pbOpts.GetScaleDownUtilizationThreshold(),
+			ScaleDownGpuUtilizationThreshold: pbOpts.GetScaleDownGpuUtilizationThreshold(),
+			ScaleDownUnneededTime:            pbOpts.GetScaleDownUnneededTime().Duration,
+			ScaleDownUnreadyTime:             pbOpts.GetScaleDownUnreadyTime().Duration,
+		}
+
+		return opts, nil
+	}
+
+	return nil, err
 }
 
 func (ng *GrpcNodeGroup) String() string {

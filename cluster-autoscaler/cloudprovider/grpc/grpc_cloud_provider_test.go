@@ -27,8 +27,6 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 )
 
-type server struct{}
-
 type testGrpcCloudProvider struct {
 	grpcCloudProvider
 	useEmbeddedTestServer bool
@@ -90,7 +88,7 @@ func testProviderWithEmbed(t *testing.T, timeout int, embedded bool) *testGrpcCl
 			manager:         manager,
 			resourceLimiter: resourceLimiter,
 			nodeGroups: []*NodeGroupDef{
-				&NodeGroupDef{
+				{
 					Provisionned:        false,
 					IncludeExistingNode: false,
 					NodeGroupID:         testGroupID,

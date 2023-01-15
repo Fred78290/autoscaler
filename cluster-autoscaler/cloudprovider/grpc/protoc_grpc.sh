@@ -1,20 +1,6 @@
-#!/bin/bash
-
-# Copyright 2021 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-PB_RELEASE="3.11.1"
+#/bin/bash
+CURDIR=$(dirname $0)
+PB_RELEASE="21.12"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 export PROTOC_DIR="/tmp/protoc-${PB_RELEASE}"
@@ -26,15 +12,24 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-go install google.golang.org/grpc@v1.26.0
-go install github.com/golang/protobuf@v1.3.2
-go install github.com/golang/protobuf/protoc-gen-go@v1.3.2
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 
-curl -LO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-linux-x86_64.zip
-unzip protoc-${PB_RELEASE}-linux-x86_64.zip
+if [ "$(uname)" = "Darwin" ]; then
+    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
+    unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
+else
+    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-linux-x86_64.zip
+    unzip protoc-${PB_RELEASE}-osx-linux-x86_64.zip
+fi
 
 popd
 
-$PROTOC_DIR/bin/protoc -I . -I vendor cloudprovider/grpc/grpc.proto --go_out=plugins=grpc:.
+$PROTOC_DIR/bin/protoc -I . -I vendor --proto_path=cloudprovider/grpc --go_out=cloudprovider/grpc --go-grpc_out=cloudprovider/grpc grpc.proto
+
+pushd $CURDIR
+cp ./grpc/grpccloudprovider/*.go .
+rm -rf ./grpc
+popd
 
 sudo rm -rf $PROTOC_DIR

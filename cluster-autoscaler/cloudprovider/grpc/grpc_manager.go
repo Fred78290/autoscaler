@@ -26,6 +26,7 @@ import (
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
@@ -76,7 +77,7 @@ func (t *GrpcManager) isConnected() bool {
 // GetCloudProviderServiceClient return nodeGroupServiceClient
 func (t *GrpcManager) GetCloudProviderServiceClient() (CloudProviderServiceClient, error) {
 
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -87,7 +88,7 @@ func (t *GrpcManager) GetCloudProviderServiceClient() (CloudProviderServiceClien
 
 // GetNodeGroupServiceClient return nodeGroupServiceClient
 func (t *GrpcManager) GetNodeGroupServiceClient() (NodeGroupServiceClient, error) {
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -98,7 +99,7 @@ func (t *GrpcManager) GetNodeGroupServiceClient() (NodeGroupServiceClient, error
 
 // GetPricingModelServiceClient return pricingModelServiceClient
 func (t *GrpcManager) GetPricingModelServiceClient() (PricingModelServiceClient, error) {
-	if t.isConnected() == false {
+	if !t.isConnected() {
 		if err := t.connect(); err != nil {
 			return nil, err
 		}
@@ -132,7 +133,7 @@ func (t *GrpcManager) connect() error {
 	var reply *ConnectReply
 
 	// Set up a connection to the server.
-	options := grpc.WithInsecure()
+	options := grpc.WithTransportCredentials(insecure.NewCredentials())
 
 	t.connection, err = grpc.Dial(t.GetGrpcServerAddress(), options)
 	if err != nil {
@@ -151,11 +152,10 @@ func (t *GrpcManager) connect() error {
 	resourceLimiter := toResourceLimiter(t.resourceLimiter)
 
 	reply, err = t.cloudProviderServiceClient.Connect(ctx, &ConnectRequest{
-		ProviderID:           t.GetCloudProviderID(),
-		ResourceLimiter:      resourceLimiter,
-		KubeAdmConfiguration: t.config.KubeAdmConfiguration,
-		Nodes:                t.nodes,
-		AutoProvisionned:     t.autoscalingOptions.NodeAutoprovisioningEnabled,
+		ProviderID:       t.GetCloudProviderID(),
+		ResourceLimiter:  resourceLimiter,
+		Nodes:            t.nodes,
+		AutoProvisionned: t.autoscalingOptions.NodeAutoprovisioningEnabled,
 	})
 
 	if err != nil {
@@ -164,7 +164,7 @@ func (t *GrpcManager) connect() error {
 		err = errors.NewAutoscalerError(errors.CloudProviderError, reply.GetError().GetReason())
 
 		log.Printf("did not connect: %v", err)
-	} else if reply.GetConnected() == false {
+	} else if !reply.GetConnected() {
 		log.Printf("Unable to connect")
 
 		err = errors.NewAutoscalerError(errors.CloudProviderError, "Unable to connect")
