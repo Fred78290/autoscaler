@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -122,7 +121,7 @@ func (grpc *grpcCloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 }
 
 // NodeGroupForNode returns the node group for the given node.
-func (grpc *grpcCloudProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
+func (grpc *grpcCloudProvider) NodeGroupForNode(node *v1.Node) (cloudprovider.NodeGroup, error) {
 	manager := grpc.GetManager()
 
 	manager.Lock()
@@ -159,7 +158,7 @@ func (grpc *grpcCloudProvider) NodeGroupForNode(node *apiv1.Node) (cloudprovider
 }
 
 // Pricing returns pricing model for this cloud provider or error if not available.
-func (grpc *grpcCloudProvider) HasInstance(node *apiv1.Node) (bool, error) {
+func (grpc *grpcCloudProvider) HasInstance(node *v1.Node) (bool, error) {
 	manager := grpc.GetManager()
 
 	manager.Lock()
@@ -257,7 +256,7 @@ func (grpc *grpcCloudProvider) GetAvailableMachineTypes() ([]string, error) {
 // NewNodeGroup builds a theoretical node group based on the node definition provided. The node group is not automatically
 // created on the cloud provider side. The node group is not returned by NodeGroups() until it is created.
 func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[string]string, systemLabels map[string]string,
-	taints []apiv1.Taint, extraResources map[string]resource.Quantity) (cloudprovider.NodeGroup, error) {
+	taints []v1.Taint, extraResources map[string]resource.Quantity) (cloudprovider.NodeGroup, error) {
 
 	manager := grpc.GetManager()
 
@@ -279,7 +278,7 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 
 	var extraResourcesRequest map[string]string
 
-	if extraResources != nil && len(extraResources) > 0 {
+	if len(extraResources) > 0 {
 		extraResourcesRequest = make(map[string]string)
 
 		for key, value := range extraResources {
@@ -292,7 +291,7 @@ func (grpc *grpcCloudProvider) NewNodeGroup(machineType string, labels map[strin
 	if err == nil {
 		for index, ng := range grpc.nodeGroups {
 			// Find a group not already provisionned
-			if ng.Provisionned == false {
+			if !ng.Provisionned {
 				r, err := cloudProviderService.NewNodeGroup(ctx, &NewNodeGroupRequest{
 					ProviderID:     manager.GetCloudProviderID(),
 					MachineType:    machineType,
@@ -498,7 +497,7 @@ func parseNodeGroupDefs(nodeGroupDefs []string) ([]*NodeGroupDef, error) {
 				values := strings.Split(labels[i], "=")
 
 				if len(values) != 2 {
-					return nil, fmt.Errorf("Misformatted label definition: %s extracted from:%s", tailStr, labels[i])
+					return nil, fmt.Errorf("misformatted label definition: %s extracted from:%s", tailStr, labels[i])
 				}
 
 				ng.Labels[values[0]] = values[1]

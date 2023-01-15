@@ -20,10 +20,9 @@ import "time"
 
 // GrpcConfig is handles config.
 type GrpcConfig struct {
-	Address              string         `json:"address"`
-	Identifier           string         `json:"secret"`
-	Timeout              int            `json:"timeout"`
-	KubeAdmConfiguration *KubeAdmConfig `json:"config"`
+	Address    string `json:"address"`
+	Identifier string `json:"secret"`
+	Timeout    int    `json:"timeout"`
 }
 
 // GetAddress returns grpc server address
