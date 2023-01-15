@@ -499,11 +499,11 @@ func (ng *GrpcNodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions)
 		r, err := nodeGroupService.GetOptions(ctx, request)
 
 		if err != nil {
-			klog.Printf("Could not get NodeGroup::GetOptions for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
+			klog.Errorf("Could not get NodeGroup::GetOptions for cloud provider:%s:%s error: %v", manager.GetCloudProviderID(), ng.name, err)
 
 			return nil, err
 		} else if rerr := r.GetError(); rerr != nil {
-			klog.Printf("Cloud provider:%s:%s call NodeGroup::GetOptions got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
+			klog.Errorf("Cloud provider:%s:%s call NodeGroup::GetOptions got error: %v", manager.GetCloudProviderID(), ng.name, rerr)
 
 			return nil, errors.NewAutoscalerError((errors.AutoscalerErrorType)(rerr.Code), rerr.Reason)
 		}
