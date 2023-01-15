@@ -6,11 +6,12 @@ option java_outer_classname = "CloudProviderGrpc";
 
 package grpccloudprovider;
 
+option go_package = "grpc/grpccloudprovider";
+
 //import "google/protobuf/struct.proto";
 //import "google/protobuf/any.proto";
 import "k8s.io/api/core/v1/generated.proto";
-//import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
-//import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CloudProvider service
@@ -53,9 +54,8 @@ message NodeGroupDef {
 message ConnectRequest {
     string providerID = 1;
     ResourceLimiter resourceLimiter = 2;
-    KubeAdmConfig kubeAdmConfiguration = 3;
-    repeated NodeGroupDef nodes = 4;
-    bool autoProvisionned = 5;
+    repeated NodeGroupDef nodes = 3;
+    bool autoProvisionned = 4;
 }
 
 message ConnectReply {
@@ -171,6 +171,7 @@ service NodeGroupService {
     rpc Delete (NodeGroupServiceRequest) returns (DeleteReply) {}
     rpc Autoprovisioned (NodeGroupServiceRequest) returns (AutoprovisionedReply) {}
     rpc Belongs (BelongsRequest) returns (BelongsReply) {}
+	rpc GetOptions(GetOptionsRequest) returns (GetOptionsReply) {}
 }
 
 message BelongsRequest {
@@ -408,3 +409,39 @@ message Instance {
     string id = 1;
     InstanceStatus status = 2;
 }
+
+message AutoscalingOptions {
+    // ScaleDownUtilizationThreshold sets threshold for nodes to be considered for scale down
+    // if cpu or memory utilization is over threshold.
+    double scaleDownUtilizationThreshold = 1;
+
+    // ScaleDownGpuUtilizationThreshold sets threshold for gpu nodes to be 
+    // considered for scale down if gpu utilization is over threshold.
+    double scaleDownGpuUtilizationThreshold = 2;
+
+    // ScaleDownUnneededTime sets the duration CA expects a node to be
+    // unneeded/eligible for removal before scaling down the node.
+    k8s.io.apimachinery.pkg.apis.meta.v1.Duration scaleDownUnneededTime = 3;
+
+    // ScaleDownUnreadyTime represents how long an unready node should be
+    // unneeded before it is eligible for scale down.
+    k8s.io.apimachinery.pkg.apis.meta.v1.Duration scaleDownUnreadyTime = 4;
+}
+
+message GetOptionsRequest {
+    string providerID = 1;
+    // ID of the node group for the request.
+    string nodeGroupID = 2;
+
+    // default node group autoscaling options.
+    AutoscalingOptions defaults = 3;
+}
+
+message GetOptionsReply {
+    oneof response {
+        Error error = 1;
+        // autoscaling options for the requested node.
+        AutoscalingOptions nodeGroupAutoscalingOptions = 2;
+    }
+}
+  

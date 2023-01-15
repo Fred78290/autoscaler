@@ -42,10 +42,6 @@ func newTestPriceModel(t *testing.T) *testPriceModel {
 	}
 }
 
-func (pm *testPriceModel) providerID(providerID string) string {
-	return fmt.Sprintf("%s://%s/object?type=group", providerID, pm.name)
-}
-
 func (pm *testPriceModel) providerIDForNode(nodeName string) string {
 	return fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, pm.name, nodeName)
 }

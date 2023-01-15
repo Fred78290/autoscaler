@@ -151,11 +151,10 @@ func (t *GrpcManager) connect() error {
 	resourceLimiter := toResourceLimiter(t.resourceLimiter)
 
 	reply, err = t.cloudProviderServiceClient.Connect(ctx, &ConnectRequest{
-		ProviderID:           t.GetCloudProviderID(),
-		ResourceLimiter:      resourceLimiter,
-		KubeAdmConfiguration: t.config.KubeAdmConfiguration,
-		Nodes:                t.nodes,
-		AutoProvisionned:     t.autoscalingOptions.NodeAutoprovisioningEnabled,
+		ProviderID:       t.GetCloudProviderID(),
+		ResourceLimiter:  resourceLimiter,
+		Nodes:            t.nodes,
+		AutoProvisionned: t.autoscalingOptions.NodeAutoprovisioningEnabled,
 	})
 
 	if err != nil {

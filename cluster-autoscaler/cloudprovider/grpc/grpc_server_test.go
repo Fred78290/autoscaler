@@ -37,6 +37,9 @@ type serverResourceLimiter struct {
 }
 
 type grpcServer struct {
+	UnimplementedCloudProviderServiceServer
+	UnimplementedNodeGroupServiceServer
+	UnimplementedPricingModelServiceServer
 	resourceLimiter serverResourceLimiter
 	nodeGroupID     string
 	minNodeSize     int32
@@ -48,10 +51,6 @@ var testGrpcServer = &grpcServer{
 	nodeGroupID: "ca-grpc-multipass",
 	minNodeSize: 0,
 	maxNodeSize: 5,
-}
-
-func providerID(groupID string) string {
-	return fmt.Sprintf("%s://%s/object?type=group", testProviderID, groupID)
 }
 
 func providerIDForNode(groupID, nodeName string) string {
@@ -413,6 +412,14 @@ func (s *grpcServer) TemplateNodeInfo(ctx context.Context, request *NodeGroupSer
 		Response: &TemplateNodeInfoReply_NodeInfo{NodeInfo: &NodeInfo{
 			Node: toJSON(node),
 		}},
+	}, nil
+}
+
+func (ng *grpcServer) GetOptions(tx context.Context, defaults *GetOptionsRequest) (*GetOptionsReply, error) {
+	return &GetOptionsReply{
+		Response: &GetOptionsReply_NodeGroupAutoscalingOptions{
+			NodeGroupAutoscalingOptions: defaults.GetDefaults(),
+		},
 	}, nil
 }
 
