@@ -53,6 +53,7 @@ const (
 	resourceNameMachineSet        = "machinesets"
 	resourceNameMachineDeployment = "machinedeployments"
 	failedMachinePrefix           = "failed-machine-"
+	pendingMachinePrefix          = "pending-machine-"
 	machineTemplateKind           = "MachineTemplate"
 	machineDeploymentKind         = "MachineDeployment"
 	machineSetKind                = "MachineSet"
@@ -252,6 +253,9 @@ func (c *machineController) findMachineByProviderID(providerID normalizedProvide
 	if isFailedMachineProviderID(providerID) {
 		return c.findMachine(machineKeyFromFailedProviderID(providerID))
 	}
+	if isPendingMachineProviderID(providerID) {
+		return c.findMachine(machineKeyFromPendingMachineProviderID(providerID))
+	}
 
 	// If the machine object has no providerID--maybe actuator
 	// does not set this value (e.g., OpenStack)--then first
@@ -266,8 +270,17 @@ func (c *machineController) findMachineByProviderID(providerID normalizedProvide
 		return nil, nil
 	}
 
-	machineID, _ := node.Annotations[machineAnnotationKey]
+	machineID := node.Annotations[machineAnnotationKey]
 	return c.findMachine(machineID)
+}
+
+func isPendingMachineProviderID(providerID normalizedProviderID) bool {
+	return strings.HasPrefix(string(providerID), pendingMachinePrefix)
+}
+
+func machineKeyFromPendingMachineProviderID(providerID normalizedProviderID) string {
+	namespaceName := strings.TrimPrefix(string(providerID), pendingMachinePrefix)
+	return strings.Replace(namespaceName, "_", "/", 1)
 }
 
 func isFailedMachineProviderID(providerID normalizedProviderID) bool {
@@ -367,7 +380,9 @@ func newMachineController(
 			Resource: resourceNameMachineDeployment,
 		}
 		machineDeploymentInformer = managementInformerFactory.ForResource(gvrMachineDeployment)
-		machineDeploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{})
+		if _, err := machineDeploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{}); err != nil {
+			return nil, fmt.Errorf("failed to add event handler for resource %q: %v", resourceNameMachineDeployment, err)
+		}
 	}
 
 	gvrMachineSet := schema.GroupVersionResource{
@@ -376,7 +391,9 @@ func newMachineController(
 		Resource: resourceNameMachineSet,
 	}
 	machineSetInformer := managementInformerFactory.ForResource(gvrMachineSet)
-	machineSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if _, err := machineSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{}); err != nil {
+		return nil, fmt.Errorf("failed to add event handler for resource %q: %v", resourceNameMachineSet, err)
+	}
 
 	gvrMachine := schema.GroupVersionResource{
 		Group:    CAPIGroup,
@@ -384,10 +401,14 @@ func newMachineController(
 		Resource: resourceNameMachine,
 	}
 	machineInformer := managementInformerFactory.ForResource(gvrMachine)
-	machineInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if _, err := machineInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{}); err != nil {
+		return nil, fmt.Errorf("failed to add event handler for resource %q: %v", resourceNameMachine, err)
+	}
 
 	nodeInformer := workloadInformerFactory.Core().V1().Nodes().Informer()
-	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if _, err := nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{}); err != nil {
+		return nil, fmt.Errorf("failed to add event handler for resource %q: %v", "nodes", err)
+	}
 
 	if err := machineInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 		machineProviderIDIndex: indexMachineByProviderID,
@@ -498,6 +519,7 @@ func (c *machineController) scalableResourceProviderIDs(scalableResource *unstru
 
 		if !found {
 			klog.V(4).Infof("Status.NodeRef of machine %q is currently nil", machine.GetName())
+			providerIDs = append(providerIDs, fmt.Sprintf("%s%s_%s", pendingMachinePrefix, machine.GetNamespace(), machine.GetName()))
 			continue
 		}
 
@@ -736,7 +758,7 @@ func (c *machineController) getInfrastructureResource(resource schema.GroupVersi
 
 	infra, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		err := fmt.Errorf("Unable to convert infrastructure reference for %s/%s", namespace, name)
+		err := fmt.Errorf("unable to convert infrastructure reference for %s/%s", namespace, name)
 		klog.V(4).Infof("%v", err)
 		return nil, err
 	}

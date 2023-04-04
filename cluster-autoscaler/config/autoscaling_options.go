@@ -128,6 +128,8 @@ type AutoscalingOptions struct {
 	EnforceNodeGroupMinSize bool
 	// ScaleDownEnabled is used to allow CA to scale down the cluster
 	ScaleDownEnabled bool
+	// ScaleDownUnreadyEnabled is used to allow CA to scale down unready nodes of the cluster
+	ScaleDownUnreadyEnabled bool
 	// ScaleDownDelayAfterAdd sets the duration from the last scale up to the time when CA starts to check scale down options
 	ScaleDownDelayAfterAdd time.Duration
 	// ScaleDownDelayAfterDelete sets the duration between scale down attempts if scale down removes one or more nodes
@@ -238,6 +240,8 @@ type AutoscalingOptions struct {
 	SkipNodesWithSystemPods bool
 	// SkipNodesWithLocalStorage tells if nodes with pods with local storage, e.g. EmptyDir or HostPath, should be deleted
 	SkipNodesWithLocalStorage bool
+	// SkipNodesWithCustomControllerPods tells if nodes with custom-controller owned pods should be skipped from deletion (skip if 'true')
+	SkipNodesWithCustomControllerPods bool
 	// MinReplicaCount controls the minimum number of replicas that a replica set or replication controller should have
 	// to allow their pods deletion in scale down
 	MinReplicaCount int

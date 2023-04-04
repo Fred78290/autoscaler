@@ -215,9 +215,9 @@ you must specify the CPU and memory annotations, these annotations should
 match the expected capacity of the nodes created from the infrastructure.
 
 For example, if my MachineDeployment will create nodes that have "16000m" CPU,
-"128G" memory, 2 NVidia GPUs, and can support 200 max pods, the folllowing
-annotations will instruct the autoscaler how to expand the node group from
-zero replicas:
+"128G" memory, "100Gi" ephemeral disk storage, 2 NVidia GPUs, and can support
+200 max pods, the following annotations will instruct the autoscaler how to
+expand the node group from zero replicas:
 
 ```yaml
 apiVersion: cluster.x-k8s.io/v1alpha4
@@ -228,6 +228,7 @@ metadata:
     cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: "0"
     capacity.cluster-autoscaler.kubernetes.io/memory: "128G"
     capacity.cluster-autoscaler.kubernetes.io/cpu: "16"
+    capacity.cluster-autoscaler.kubernetes.io/ephemeral-disk: "100Gi"
     capacity.cluster-autoscaler.kubernetes.io/gpu-type: "nvidia.com/gpu"
     capacity.cluster-autoscaler.kubernetes.io/gpu-count: "2"
     capacity.cluster-autoscaler.kubernetes.io/maxPods: "200"
@@ -262,10 +263,22 @@ rules:
 
 #### Pre-defined labels and taints on nodes scaled from zero
 
-The Cluster API provider currently does not support the addition of pre-defined
-labels and taints for node groups that are scaling from zero. This work is on-going
-and will be included in a future release once the API for specifying those
-labels and taints has been accepted by the community.
+To provide labels or taint information for scale from zero, the optional
+capacity annotations may be supplied as a comma separated list, as 
+demonstrated in the example below:
+
+```yaml
+apiVersion: cluster.x-k8s.io/v1alpha4
+kind: MachineDeployment
+metadata:
+  annotations:
+    cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: "5"
+    cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: "0"
+    capacity.cluster-autoscaler.kubernetes.io/memory: "128G"
+    capacity.cluster-autoscaler.kubernetes.io/cpu: "16"
+    capacity.cluster-autoscaler.kubernetes.io/labels: "key1=value1,key2=value2"
+    capacity.cluster-autoscaler.kubernetes.io/taints: "key1=value1:NoSchedule,key2=value2:NoExecute"
+```
 
 ## Specifying a Custom Resource Group
 

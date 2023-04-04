@@ -28,11 +28,14 @@ import (
 )
 
 const (
-	cpuKey      = "capacity.cluster-autoscaler.kubernetes.io/cpu"
-	memoryKey   = "capacity.cluster-autoscaler.kubernetes.io/memory"
-	gpuTypeKey  = "capacity.cluster-autoscaler.kubernetes.io/gpu-type"
-	gpuCountKey = "capacity.cluster-autoscaler.kubernetes.io/gpu-count"
-	maxPodsKey  = "capacity.cluster-autoscaler.kubernetes.io/maxPods"
+	cpuKey          = "capacity.cluster-autoscaler.kubernetes.io/cpu"
+	memoryKey       = "capacity.cluster-autoscaler.kubernetes.io/memory"
+	diskCapacityKey = "capacity.cluster-autoscaler.kubernetes.io/ephemeral-disk"
+	gpuTypeKey      = "capacity.cluster-autoscaler.kubernetes.io/gpu-type"
+	gpuCountKey     = "capacity.cluster-autoscaler.kubernetes.io/gpu-count"
+	maxPodsKey      = "capacity.cluster-autoscaler.kubernetes.io/maxPods"
+	taintsKey       = "capacity.cluster-autoscaler.kubernetes.io/taints"
+	labelsKey       = "capacity.cluster-autoscaler.kubernetes.io/labels"
 )
 
 var (
@@ -201,6 +204,10 @@ func parseCPUCapacity(annotations map[string]string) (resource.Quantity, error) 
 
 func parseMemoryCapacity(annotations map[string]string) (resource.Quantity, error) {
 	return parseKey(annotations, memoryKey)
+}
+
+func parseEphemeralDiskCapacity(annotations map[string]string) (resource.Quantity, error) {
+	return parseKey(annotations, diskCapacityKey)
 }
 
 func parseGPUCount(annotations map[string]string) (resource.Quantity, error) {
