@@ -44,6 +44,7 @@ require (
 	k8s.io/component-base v0.27.1
 	k8s.io/component-helpers v0.27.1
 	k8s.io/klog/v2 v2.90.1
+	k8s.io/kubelet v0.27.1
 	k8s.io/kubernetes v1.27.1
 	k8s.io/legacy-cloud-providers v0.0.0
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
@@ -182,7 +183,6 @@ require (
 	k8s.io/kube-proxy v0.0.0 // indirect
 	k8s.io/kube-scheduler v0.0.0 // indirect
 	k8s.io/kubectl v0.0.0 // indirect
-	k8s.io/kubelet v0.27.1 // indirect
 	k8s.io/mount-utils v0.26.0-alpha.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

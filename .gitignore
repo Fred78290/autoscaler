@@ -28,3 +28,9 @@
 Session.vim
 .netrwhist
 
+
+cluster-autoscaler/out/
+
+cluster-autoscaler/aws.sh
+
+cluster-autoscaler/vsphere.sh
