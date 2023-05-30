@@ -193,14 +193,17 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 		mainCreatedNodeInfo, aErr := utils.GetNodeInfoFromTemplate(createNodeGroupResult.MainCreatedNodeGroup, daemonSets, o.taintConfig)
 		if aErr == nil {
 			nodeInfos[createNodeGroupResult.MainCreatedNodeGroup.Id()] = mainCreatedNodeInfo
+			schedulablePods[createNodeGroupResult.MainCreatedNodeGroup.Id()] = o.SchedulablePods(podEquivalenceGroups, createNodeGroupResult.MainCreatedNodeGroup, mainCreatedNodeInfo)
 		} else {
 			klog.Warningf("Cannot build node info for newly created main node group %v; balancing similar node groups may not work; err=%v", createNodeGroupResult.MainCreatedNodeGroup.Id(), aErr)
-			// Use node info based on expansion candidate but upadte Id which likely changed when node group was created.
-			nodeInfos[bestOption.NodeGroup.Id()] = nodeInfos[oldId]
+			// Use node info based on expansion candidate but update Id which likely changed when node group was created.
+			nodeInfos[createNodeGroupResult.MainCreatedNodeGroup.Id()] = nodeInfos[oldId]
+			schedulablePods[createNodeGroupResult.MainCreatedNodeGroup.Id()] = schedulablePods[oldId]
 		}
 
 		if oldId != createNodeGroupResult.MainCreatedNodeGroup.Id() {
 			delete(nodeInfos, oldId)
+			delete(schedulablePods, oldId)
 		}
 
 		for _, nodeGroup := range createNodeGroupResult.ExtraCreatedNodeGroups {
@@ -217,10 +220,10 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 		// TODO(lukaszos) when pursuing scalability update this call with one which takes list of changed node groups so we do not
 		//                do extra API calls. (the call at the bottom of ScaleUp() could be also changed then)
 		o.clusterStateRegistry.Recalculate()
-
-		// Recompute similar node groups
-		bestOption.SimilarNodeGroups = o.ComputeSimilarNodeGroups(bestOption.NodeGroup, nodeInfos, schedulablePods, now)
 	}
+
+	// Recompute similar node groups in case they need to be updated
+	bestOption.SimilarNodeGroups = o.ComputeSimilarNodeGroups(bestOption.NodeGroup, nodeInfos, schedulablePods, now)
 
 	nodeInfo, found := nodeInfos[bestOption.NodeGroup.Id()]
 	if !found {
