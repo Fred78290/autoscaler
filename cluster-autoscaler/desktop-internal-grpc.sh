@@ -15,12 +15,13 @@
 # limitations under the License.
 
 DIR=$(dirname $0)
+NODEGROUP_NAME="desktop-$(hostname | cut -d '.' -f 1 | cut -d '-' -f 1)-k3s"
 
 cat > /tmp/grpc-config.json <<EOF
 {
     "address": "unix:/var/run/cluster-autoscaler/vmware.sock",
-    "secret": "vmware",
-    "timeout": 300
+    "secret": "desktop",
+    "timeout": 600
 }
 EOF
 
@@ -29,8 +30,8 @@ $DIR/cluster-autoscaler \
 --stderrthreshold=info \
 --cloud-provider=grpc \
 --cloud-config=/tmp/grpc-config.json \
---kubeconfig=${HOME}/Projects/autoscaled-masterkube-desktop/cluster/desktop-dev-k3s/config \
---nodes=0:9:true/desktop-dev-k3s \
+--kubeconfig=${HOME}/Projects/autoscaled-masterkube-desktop/cluster/${NODEGROUP_NAME}/config \
+--nodes=0:9:true/${NODEGROUP_NAME} \
 --max-nodes-total=9 \
 --cores-total=0:36 \
 --memory-total=0:48 \
