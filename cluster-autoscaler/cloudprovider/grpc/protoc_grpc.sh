@@ -15,13 +15,11 @@ pushd $PROTOC_DIR
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 
-if [ "$(uname)" = "Darwin" ]; then
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
-    unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
-else
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-    unzip protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-fi
+PB_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n aarch_64 || echo -n x86_64)
+OS=$([ "$(uname)" = "Darwin" ] && echo -n osx || echo -n linux)
+
+curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-${OS}-${PB_ARCH}.zip
+unzip protoc-${PB_RELEASE}-${OS}-${PB_ARCH}.zip
 
 popd
 
