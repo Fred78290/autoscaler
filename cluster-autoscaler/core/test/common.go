@@ -186,7 +186,7 @@ func NewTestProcessors(context *context.AutoscalingContext) *processors.Autoscal
 		NodeGroupManager:            nodegroups.NewDefaultNodeGroupManager(),
 		NodeInfoProcessor:           nodeinfos.NewDefaultNodeInfoProcessor(),
 		TemplateNodeInfoProvider:    nodeinfosprovider.NewDefaultTemplateNodeInfoProvider(nil, false),
-		NodeGroupConfigProcessor:    nodegroupconfig.NewDefaultNodeGroupConfigProcessor(),
+		NodeGroupConfigProcessor:    nodegroupconfig.NewDefaultNodeGroupConfigProcessor(context.NodeGroupDefaults),
 		CustomResourcesProcessor:    customresources.NewDefaultCustomResourcesProcessor(),
 		ActionableClusterProcessor:  actionablecluster.NewDefaultActionableClusterProcessor(),
 		ScaleDownCandidatesNotifier: scaledowncandidates.NewObserversList(),
@@ -212,6 +212,7 @@ func NewScaleTestAutoscalingContext(
 		options.EstimatorName,
 		estimator.NewThresholdBasedEstimationLimiter(nil),
 		estimator.NewDecreasingPodOrderer(),
+		/* EstimationAnalyserFunc */ nil,
 	)
 	predicateChecker, err := predicatechecker.NewTestPredicateChecker()
 	if err != nil {

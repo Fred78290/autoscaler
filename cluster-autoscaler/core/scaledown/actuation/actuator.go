@@ -52,10 +52,18 @@ type Actuator struct {
 	// This is a larger change to the code structure which impacts some existing actuator unit tests
 	// as well as Cluster Autoscaler implementations that may override ScaleDownSetProcessor
 	budgetProcessor *budgets.ScaleDownBudgetProcessor
+	configGetter    actuatorNodeGroupConfigGetter
+}
+
+// actuatorNodeGroupConfigGetter is an interface to limit the functions that can be used
+// from NodeGroupConfigProcessor interface
+type actuatorNodeGroupConfigGetter interface {
+	// GetIgnoreDaemonSetsUtilization returns IgnoreDaemonSetsUtilization value that should be used for a given NodeGroup.
+	GetIgnoreDaemonSetsUtilization(nodeGroup cloudprovider.NodeGroup) (bool, error)
 }
 
 // NewActuator returns a new instance of Actuator.
-func NewActuator(ctx *context.AutoscalingContext, csr *clusterstate.ClusterStateRegistry, ndt *deletiontracker.NodeDeletionTracker, deleteOptions simulator.NodeDeleteOptions) *Actuator {
+func NewActuator(ctx *context.AutoscalingContext, csr *clusterstate.ClusterStateRegistry, ndt *deletiontracker.NodeDeletionTracker, deleteOptions simulator.NodeDeleteOptions, configGetter actuatorNodeGroupConfigGetter) *Actuator {
 	ndb := NewNodeDeletionBatcher(ctx, csr, ndt, ctx.NodeDeletionBatcherInterval)
 	return &Actuator{
 		ctx:                   ctx,
@@ -64,6 +72,7 @@ func NewActuator(ctx *context.AutoscalingContext, csr *clusterstate.ClusterState
 		nodeDeletionScheduler: NewGroupDeletionScheduler(ctx, ndt, ndb, NewDefaultEvictor(deleteOptions, ndt)),
 		budgetProcessor:       budgets.NewScaleDownBudgetProcessor(ctx),
 		deleteOptions:         deleteOptions,
+		configGetter:          configGetter,
 	}
 }
 
@@ -79,6 +88,7 @@ func (a *Actuator) ClearResultsNotNewerThan(t time.Time) {
 
 // StartDeletion triggers a new deletion process.
 func (a *Actuator) StartDeletion(empty, drain []*apiv1.Node) (*status.ScaleDownStatus, errors.AutoscalerError) {
+	a.nodeDeletionScheduler.ReportMetrics()
 	deletionStartTime := time.Now()
 	defer func() { metrics.UpdateDuration(metrics.ScaleDownNodeDeletion, time.Now().Sub(deletionStartTime)) }()
 
@@ -138,7 +148,7 @@ func (a *Actuator) deleteAsyncEmpty(NodeGroupViews []*budgets.NodeGroupView) (re
 	}
 
 	for _, bucket := range NodeGroupViews {
-		go a.deleteNodesAsync(bucket.Nodes, bucket.Group, false)
+		go a.deleteNodesAsync(bucket.Nodes, bucket.Group, false, bucket.BatchSize)
 	}
 
 	return reportedSDNodes
@@ -183,13 +193,13 @@ func (a *Actuator) deleteAsyncDrain(NodeGroupViews []*budgets.NodeGroupView) (re
 	}
 
 	for _, bucket := range NodeGroupViews {
-		go a.deleteNodesAsync(bucket.Nodes, bucket.Group, true)
+		go a.deleteNodesAsync(bucket.Nodes, bucket.Group, true, bucket.BatchSize)
 	}
 
 	return reportedSDNodes
 }
 
-func (a *Actuator) deleteNodesAsync(nodes []*apiv1.Node, nodeGroup cloudprovider.NodeGroup, drain bool) {
+func (a *Actuator) deleteNodesAsync(nodes []*apiv1.Node, nodeGroup cloudprovider.NodeGroup, drain bool, batchSize int) {
 	var pdbs []*policyv1.PodDisruptionBudget
 	var registry kube_util.ListerRegistry
 
@@ -226,6 +236,10 @@ func (a *Actuator) deleteNodesAsync(nodes []*apiv1.Node, nodeGroup cloudprovider
 		registry = a.ctx.ListerRegistry
 	}
 
+	if batchSize == 0 {
+		batchSize = len(nodes)
+	}
+
 	for _, node := range nodes {
 		nodeInfo, err := clusterSnapshot.NodeInfos().Get(node.Name)
 		if err != nil {
@@ -250,7 +264,7 @@ func (a *Actuator) deleteNodesAsync(nodes []*apiv1.Node, nodeGroup cloudprovider
 			continue
 		}
 
-		go a.nodeDeletionScheduler.ScheduleDeletion(nodeInfo, nodeGroup, len(nodes), drain)
+		go a.nodeDeletionScheduler.ScheduleDeletion(nodeInfo, nodeGroup, batchSize, drain)
 	}
 }
 
@@ -263,8 +277,14 @@ func (a *Actuator) scaleDownNodeToReport(node *apiv1.Node, drain bool) (*status.
 	if err != nil {
 		return nil, err
 	}
+
+	ignoreDaemonSetsUtilization, err := a.configGetter.GetIgnoreDaemonSetsUtilization(nodeGroup)
+	if err != nil {
+		return nil, err
+	}
+
 	gpuConfig := a.ctx.CloudProvider.GetNodeGpuConfig(node)
-	utilInfo, err := utilization.Calculate(nodeInfo, a.ctx.IgnoreDaemonSetsUtilization, a.ctx.IgnoreMirrorPodsUtilization, gpuConfig, time.Now())
+	utilInfo, err := utilization.Calculate(nodeInfo, ignoreDaemonSetsUtilization, a.ctx.IgnoreMirrorPodsUtilization, gpuConfig, time.Now())
 	if err != nil {
 		return nil, err
 	}

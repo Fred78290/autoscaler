@@ -35,7 +35,6 @@ import (
 
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/clusterstate"
-	"k8s.io/autoscaler/cluster-autoscaler/clusterstate/providers"
 	"k8s.io/autoscaler/cluster-autoscaler/clusterstate/utils"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
@@ -141,13 +140,14 @@ func NewStaticAutoscaler(
 	backoff backoff.Backoff,
 	debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter,
 	remainingPdbTracker pdb.RemainingPdbTracker,
-	scaleUpOrchestrator scaleup.Orchestrator) *StaticAutoscaler {
+	scaleUpOrchestrator scaleup.Orchestrator,
+	deleteOptions simulator.NodeDeleteOptions) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
 		OkTotalUnreadyCount:       opts.OkTotalUnreadyCount,
 	}
-	clusterStateRegistry := clusterstate.NewClusterStateRegistry(cloudProvider, clusterStateConfig, autoscalingKubeClients.LogRecorder, backoff)
+	clusterStateRegistry := clusterstate.NewClusterStateRegistry(cloudProvider, clusterStateConfig, autoscalingKubeClients.LogRecorder, backoff, processors.NodeGroupConfigProcessor)
 	processorCallbacks := newStaticAutoscalerProcessorCallbacks()
 	autoscalingContext := context.NewAutoscalingContext(
 		opts,
@@ -163,16 +163,13 @@ func NewStaticAutoscaler(
 		clusterStateRegistry)
 
 	taintConfig := taints.NewTaintConfig(opts)
-	clusterStateRegistry.RegisterProviders(providers.NewDefaultMaxNodeProvisionTimeProvider(autoscalingContext, processors.NodeGroupConfigProcessor))
 	processors.ScaleDownCandidatesNotifier.Register(clusterStateRegistry)
-
-	deleteOptions := simulator.NewNodeDeleteOptions(opts)
 
 	// TODO: Populate the ScaleDownActuator/Planner fields in AutoscalingContext
 	// during the struct creation rather than here.
 	ndt := deletiontracker.NewNodeDeletionTracker(0 * time.Second)
 	scaleDown := legacy.NewScaleDown(autoscalingContext, processors, ndt, deleteOptions)
-	actuator := actuation.NewActuator(autoscalingContext, clusterStateRegistry, ndt, deleteOptions)
+	actuator := actuation.NewActuator(autoscalingContext, clusterStateRegistry, ndt, deleteOptions, processors.NodeGroupConfigProcessor)
 	autoscalingContext.ScaleDownActuator = actuator
 
 	var scaleDownPlanner scaledown.Planner
@@ -406,7 +403,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	unregisteredNodes := a.clusterStateRegistry.GetUnregisteredNodes()
 	if len(unregisteredNodes) > 0 {
 		klog.V(1).Infof("%d unregistered nodes present", len(unregisteredNodes))
-		removedAny, err := removeOldUnregisteredNodes(unregisteredNodes, autoscalingContext,
+		removedAny, err := a.removeOldUnregisteredNodes(unregisteredNodes, autoscalingContext,
 			a.clusterStateRegistry, currentTime, autoscalingContext.LogRecorder)
 		// There was a problem with removing unregistered nodes. Retry in the next loop.
 		if err != nil {
@@ -724,14 +721,16 @@ func fixNodeGroupSize(context *context.AutoscalingContext, clusterStateRegistry 
 }
 
 // Removes unregistered nodes if needed. Returns true if anything was removed and error if such occurred.
-func removeOldUnregisteredNodes(unregisteredNodes []clusterstate.UnregisteredNode, context *context.AutoscalingContext,
+func (a *StaticAutoscaler) removeOldUnregisteredNodes(allUnregisteredNodes []clusterstate.UnregisteredNode, context *context.AutoscalingContext,
 	csr *clusterstate.ClusterStateRegistry, currentTime time.Time, logRecorder *utils.LogEventRecorder) (bool, error) {
-	removedAny := false
-	for _, unregisteredNode := range unregisteredNodes {
-		nodeGroup, err := context.CloudProvider.NodeGroupForNode(unregisteredNode.Node)
+
+	nodeGroups := a.nodeGroupsById()
+	nodesToBeDeletedByNodeGroupId := make(map[string][]clusterstate.UnregisteredNode)
+	for _, unregisteredNode := range allUnregisteredNodes {
+		nodeGroup, err := a.CloudProvider.NodeGroupForNode(unregisteredNode.Node)
 		if err != nil {
 			klog.Warningf("Failed to get node group for %s: %v", unregisteredNode.Node.Name, err)
-			return removedAny, err
+			continue
 		}
 		if nodeGroup == nil || reflect.ValueOf(nodeGroup).IsNil() {
 			klog.Warningf("No node group for node %s, skipping", unregisteredNode.Node.Name)
@@ -740,35 +739,78 @@ func removeOldUnregisteredNodes(unregisteredNodes []clusterstate.UnregisteredNod
 
 		maxNodeProvisionTime, err := csr.MaxNodeProvisionTime(nodeGroup)
 		if err != nil {
-			return removedAny, fmt.Errorf("failed to retrieve maxNodeProvisionTime for node %s in nodeGroup %s", unregisteredNode.Node.Name, nodeGroup.Id())
+			return false, fmt.Errorf("failed to retrieve maxNodeProvisionTime for node %s in nodeGroup %s", unregisteredNode.Node.Name, nodeGroup.Id())
 		}
 
 		if unregisteredNode.UnregisteredSince.Add(maxNodeProvisionTime).Before(currentTime) {
-			klog.V(0).Infof("Removing unregistered node %v", unregisteredNode.Node.Name)
-			size, err := nodeGroup.TargetSize()
-			if err != nil {
-				klog.Warningf("Failed to get node group size; unregisteredNode=%v; nodeGroup=%v; err=%v", unregisteredNode.Node.Name, nodeGroup.Id(), err)
-				continue
-			}
-			if nodeGroup.MinSize() >= size {
-				klog.Warningf("Failed to remove node %s: node group min size reached, skipping unregistered node removal", unregisteredNode.Node.Name)
-				continue
-			}
-			err = nodeGroup.DeleteNodes([]*apiv1.Node{unregisteredNode.Node})
-			csr.InvalidateNodeInstancesCacheEntry(nodeGroup)
-			if err != nil {
-				klog.Warningf("Failed to remove node %s: %v", unregisteredNode.Node.Name, err)
-				logRecorder.Eventf(apiv1.EventTypeWarning, "DeleteUnregisteredFailed",
-					"Failed to remove node %s: %v", unregisteredNode.Node.Name, err)
-				return removedAny, err
-			}
-			logRecorder.Eventf(apiv1.EventTypeNormal, "DeleteUnregistered",
-				"Removed unregistered node %v", unregisteredNode.Node.Name)
-			metrics.RegisterOldUnregisteredNodesRemoved(1)
-			removedAny = true
+			klog.V(0).Infof("Marking unregistered node %v for removal", unregisteredNode.Node.Name)
+			nodesToBeDeletedByNodeGroupId[nodeGroup.Id()] = append(nodesToBeDeletedByNodeGroupId[nodeGroup.Id()], unregisteredNode)
 		}
 	}
+
+	removedAny := false
+	for nodeGroupId, unregisteredNodesToDelete := range nodesToBeDeletedByNodeGroupId {
+		nodeGroup := nodeGroups[nodeGroupId]
+
+		klog.V(0).Infof("Removing %v unregistered nodes for node group %v", len(unregisteredNodesToDelete), nodeGroupId)
+		size, err := nodeGroup.TargetSize()
+		if err != nil {
+			klog.Warningf("Failed to get node group size; nodeGroup=%v; err=%v", nodeGroup.Id(), err)
+			continue
+		}
+		possibleToDelete := size - nodeGroup.MinSize()
+		if possibleToDelete <= 0 {
+			klog.Warningf("Node group %s min size reached, skipping removal of %v unregistered nodes", nodeGroupId, len(unregisteredNodesToDelete))
+			continue
+		}
+		if len(unregisteredNodesToDelete) > possibleToDelete {
+			klog.Warningf("Capping node group %s unregistered node removal to %d nodes, removing all %d would exceed min size constaint", nodeGroupId, possibleToDelete, len(unregisteredNodesToDelete))
+			unregisteredNodesToDelete = unregisteredNodesToDelete[:possibleToDelete]
+		}
+		nodesToDelete := toNodes(unregisteredNodesToDelete)
+
+		opts, err := nodeGroup.GetOptions(a.NodeGroupDefaults)
+		if err != nil {
+			klog.Warningf("Failed to get node group options for %s: %s", nodeGroupId, err)
+			continue
+		}
+		// If a scale-up of "ZeroOrMaxNodeScaling" node group failed, the cleanup
+		// should stick to the all-or-nothing principle. Deleting all nodes.
+		if opts != nil && opts.ZeroOrMaxNodeScaling {
+			instances, err := nodeGroup.Nodes()
+			if err != nil {
+				klog.Warningf("Failed to fill in unregistered nodes from group %s based on ZeroOrMaxNodeScaling option: %s", nodeGroupId, err)
+				continue
+			}
+			nodesToDelete = instancesToFakeNodes(instances)
+		}
+
+		err = nodeGroup.DeleteNodes(nodesToDelete)
+		csr.InvalidateNodeInstancesCacheEntry(nodeGroup)
+		if err != nil {
+			klog.Warningf("Failed to remove %v unregistered nodes from node group %s: %v", len(nodesToDelete), nodeGroupId, err)
+			for _, node := range nodesToDelete {
+				logRecorder.Eventf(apiv1.EventTypeWarning, "DeleteUnregisteredFailed",
+					"Failed to remove node %s: %v", node.Name, err)
+			}
+			return removedAny, err
+		}
+		for _, node := range nodesToDelete {
+			logRecorder.Eventf(apiv1.EventTypeNormal, "DeleteUnregistered",
+				"Removed unregistered node %v", node.Name)
+		}
+		metrics.RegisterOldUnregisteredNodesRemoved(len(nodesToDelete))
+		removedAny = true
+	}
 	return removedAny, nil
+}
+
+func toNodes(unregisteredNodes []clusterstate.UnregisteredNode) []*apiv1.Node {
+	nodes := []*apiv1.Node{}
+	for _, n := range unregisteredNodes {
+		nodes = append(nodes, n.Node)
+	}
+	return nodes
 }
 
 func (a *StaticAutoscaler) deleteCreatedNodesWithErrors() (bool, error) {
@@ -806,6 +848,21 @@ func (a *StaticAutoscaler) deleteCreatedNodesWithErrors() (bool, error) {
 		if nodeGroup == nil {
 			err = fmt.Errorf("node group %s not found", nodeGroupId)
 		} else {
+			opts, err := nodeGroup.GetOptions(a.NodeGroupDefaults)
+			if err != nil {
+				klog.Warningf("Failed to get node group options for %s: %s", nodeGroupId, err)
+				continue
+			}
+			// If a scale-up of "ZeroOrMaxNodeScaling" node group failed, the cleanup
+			// should stick to the all-or-nothing principle. Deleting all nodes.
+			if opts != nil && opts.ZeroOrMaxNodeScaling {
+				instances, err := nodeGroup.Nodes()
+				if err != nil {
+					klog.Warningf("Failed to fill in failed nodes from group %s based on ZeroOrMaxNodeScaling option: %s", nodeGroupId, err)
+					continue
+				}
+				nodesToBeDeleted = instancesToFakeNodes(instances)
+			}
 			err = nodeGroup.DeleteNodes(nodesToBeDeleted)
 		}
 
@@ -818,6 +875,16 @@ func (a *StaticAutoscaler) deleteCreatedNodesWithErrors() (bool, error) {
 	}
 
 	return deletedAny, nil
+}
+
+// instancesToNodes returns a list of fake nodes with just names populated,
+// so that they can be passed as nodes to delete
+func instancesToFakeNodes(instances []cloudprovider.Instance) []*apiv1.Node {
+	nodes := []*apiv1.Node{}
+	for _, i := range instances {
+		nodes = append(nodes, clusterstate.FakeNode(i, ""))
+	}
+	return nodes
 }
 
 func (a *StaticAutoscaler) nodeGroupsById() map[string]cloudprovider.NodeGroup {
