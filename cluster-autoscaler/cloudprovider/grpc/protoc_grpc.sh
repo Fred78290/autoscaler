@@ -1,6 +1,6 @@
 #/bin/bash
 CURDIR=$(dirname $0)
-PB_RELEASE="21.12"
+PB_RELEASE="24.1"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 export PROTOC_DIR="/tmp/protoc-${PB_RELEASE}"
@@ -12,16 +12,14 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
-if [ "$(uname)" = "Darwin" ]; then
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
-    unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
-else
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-    unzip protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-fi
+PB_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n aarch_64 || echo -n x86_64)
+OS=$([ "$(uname)" = "Darwin" ] && echo -n osx || echo -n linux)
+
+curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-${OS}-${PB_ARCH}.zip
+unzip protoc-${PB_RELEASE}-${OS}-${PB_ARCH}.zip
 
 popd
 
