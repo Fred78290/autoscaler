@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 
+	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -52,6 +53,37 @@ type grpcCloudProvider struct {
 
 func (grpc *grpcCloudProvider) GetManager() *GrpcManager {
 	return grpc.manager
+}
+
+// GetNodeGpuConfig returns the label, type and resource name for the GPU added to node. If node doesn't have
+// any GPUs, it returns nil.
+func (grpc *grpcCloudProvider) GetNodeGpuConfig(node *apiv1.Node) *cloudprovider.GpuConfig {
+	var gpuConfig *cloudprovider.GpuConfig
+	manager := grpc.GetManager()
+
+	manager.Lock()
+	defer manager.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), manager.GetGrpcTimeout())
+	defer cancel()
+
+	if cloudProviderService, err := manager.GetCloudProviderServiceClient(); err == nil {
+		if r, err := cloudProviderService.GetNodeGpuConfig(ctx, &GetNodeGpuConfigRequest{ProviderID: manager.GetCloudProviderID(), Node: toJSON(node)}); err != nil {
+			log.Printf("Could not get GetNodeGpuConfig for cloud provider:%s error: %v", manager.GetCloudProviderID(), err)
+		} else if rerr := r.GetError(); rerr != nil {
+			log.Printf("Cloud provider:%s call GetNodeGpuConfig got error: %v", manager.GetCloudProviderID(), rerr)
+		} else if r.GetGpuConfig().HaveGpu {
+			config := r.GetGpuConfig()
+
+			gpuConfig = &cloudprovider.GpuConfig{
+				Label:        config.Label,
+				Type:         config.Type,
+				ResourceName: v1.ResourceName(config.ResourceName),
+			}
+		}
+	}
+
+	return gpuConfig
 }
 
 // Cleanup stops the go routine that is handling the current view of the ASGs in the form of a cache

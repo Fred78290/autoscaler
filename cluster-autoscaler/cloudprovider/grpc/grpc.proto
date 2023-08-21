@@ -30,6 +30,26 @@ service CloudProviderService {
     rpc Cleanup (CloudProviderServiceRequest) returns (CleanupReply) {}
     rpc Refresh (CloudProviderServiceRequest) returns (RefreshReply) {}
 	rpc HasInstance(HasInstanceRequest) returns (HasInstanceReply) {}
+	rpc GetNodeGpuConfig(GetNodeGpuConfigRequest) returns (GetNodeGpuConfigReply) {}
+}
+
+message GetNodeGpuConfigRequest {
+    string providerID = 1;
+    string node = 2;
+}
+
+message GpuConfig {
+	bool haveGpu = 1;
+	string label = 2;
+	string type = 3;
+	string resourceName = 4;
+}
+
+message GetNodeGpuConfigReply {
+	oneof response {
+        Error error = 1;
+        GpuConfig gpuConfig = 2;
+    }
 }
 
 message CloudProviderServiceRequest {
