@@ -28,6 +28,8 @@
 Session.vim
 .netrwhist
 
+# Binary files
+bin/
 
 cluster-autoscaler/out/
 
