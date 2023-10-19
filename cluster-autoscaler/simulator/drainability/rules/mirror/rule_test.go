@@ -19,20 +19,19 @@ package mirror
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-func TestRule(t *testing.T) {
-	testCases := []struct {
-		desc string
+func TestDrainable(t *testing.T) {
+	for desc, tc := range map[string]struct {
 		pod  *apiv1.Pod
 		want drainability.Status
 	}{
-		{
-			desc: "non mirror pod",
+		"regular pod": {
 			pod: &apiv1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "regularPod",
@@ -41,8 +40,7 @@ func TestRule(t *testing.T) {
 			},
 			want: drainability.NewUndefinedStatus(),
 		},
-		{
-			desc: "mirror pod",
+		"mirror pod": {
 			pod: &apiv1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "manifestPod",
@@ -54,12 +52,11 @@ func TestRule(t *testing.T) {
 			},
 			want: drainability.NewSkipStatus(),
 		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
+	} {
+		t.Run(desc, func(t *testing.T) {
 			got := New().Drainable(nil, tc.pod)
-			if tc.want != got {
-				t.Errorf("Rule.Drainable(%v) = %v, want %v", tc.pod.Name, got, tc.want)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Rule.Drainable(%v): got status diff (-want +got):\n%s", tc.pod.Name, diff)
 			}
 		})
 	}

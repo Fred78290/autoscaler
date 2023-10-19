@@ -123,9 +123,6 @@ func (r *RemovalSimulator) FindNodesToRemove(
 	timestamp time.Time,
 	remainingPdbTracker pdb.RemainingPdbTracker,
 ) (nodesToRemove []NodeToBeRemoved, unremovableNodes []*UnremovableNode) {
-	result := make([]NodeToBeRemoved, 0)
-	unremovable := make([]*UnremovableNode, 0)
-
 	destinationMap := make(map[string]bool, len(destinations))
 	for _, destination := range destinations {
 		destinationMap[destination] = true
@@ -134,12 +131,12 @@ func (r *RemovalSimulator) FindNodesToRemove(
 	for _, nodeName := range candidates {
 		rn, urn := r.SimulateNodeRemoval(nodeName, destinationMap, timestamp, remainingPdbTracker)
 		if rn != nil {
-			result = append(result, *rn)
+			nodesToRemove = append(nodesToRemove, *rn)
 		} else if urn != nil {
-			unremovable = append(unremovable, urn)
+			unremovableNodes = append(unremovableNodes, urn)
 		}
 	}
-	return result, unremovable
+	return nodesToRemove, unremovableNodes
 }
 
 // SimulateNodeRemoval simulates removing a node from the cluster to check
@@ -156,7 +153,7 @@ func (r *RemovalSimulator) SimulateNodeRemoval(
 	if err != nil {
 		klog.Errorf("Can't retrieve node %s from snapshot, err: %v", nodeName, err)
 	}
-	klog.V(2).Infof("%s for removal", nodeName)
+	klog.V(2).Infof("Simulating node %s removal", nodeName)
 
 	if _, found := destinationMap[nodeName]; !found {
 		klog.V(2).Infof("nodeInfo for %s not found", nodeName)
