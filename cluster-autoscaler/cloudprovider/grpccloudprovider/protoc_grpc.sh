@@ -1,6 +1,6 @@
 #/bin/bash
 CURDIR=$(dirname $0)
-PB_RELEASE="24.1"
+PB_RELEASE="25.1"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 export PROTOC_DIR="/tmp/protoc-${PB_RELEASE}"
@@ -12,7 +12,7 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 PB_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n aarch_64 || echo -n x86_64)
@@ -23,7 +23,7 @@ unzip protoc-${PB_RELEASE}-${OS}-${PB_ARCH}.zip
 
 popd
 
-$PROTOC_DIR/bin/protoc -I . -I vendor --proto_path=cloudprovider/grpc --go_out=cloudprovider/grpc --go-grpc_out=cloudprovider/grpc grpc.proto
+$PROTOC_DIR/bin/protoc -I . -I vendor --proto_path=cloudprovider/grpccloudprovider --go_out=cloudprovider/grpccloudprovider --go-grpc_out=cloudprovider/grpccloudprovider grpc.proto
 
 pushd $CURDIR
 cp ./grpc/grpccloudprovider/*.go .

@@ -35,8 +35,8 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/exoscale"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/grpccloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/hetzner"
-	grpccloudprovider "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/grpc"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kamatera"
@@ -77,7 +77,6 @@ var AvailableCloudProviders = []string{
 	cloudprovider.KamateraProviderName,
 	cloudprovider.KwokProviderName,
 	cloudprovider.LinodeProviderName,
-	grpccloudprovider.ProviderName,
 	cloudprovider.BizflyCloudProviderName,
 	cloudprovider.BrightboxProviderName,
 	cloudprovider.PacketProviderName,
@@ -87,6 +86,7 @@ var AvailableCloudProviders = []string{
 	cloudprovider.ScalewayProviderName,
 	cloudprovider.RancherProviderName,
 	cloudprovider.VolcengineProviderName,
+	cloudprovider.GrpcProviderName,
 }
 
 // DefaultCloudProvider is GCE.
@@ -155,7 +155,7 @@ func buildCloudProvider(opts config.AutoscalingOptions,
 		return rancher.BuildRancher(opts, do, rl)
 	case cloudprovider.VolcengineProviderName:
 		return volcengine.BuildVolcengine(opts, do, rl)
-	case grpccloudprovider.ProviderName:
+	case cloudprovider.GrpcProviderName:
 		return grpccloudprovider.BuildGrpc(opts, do, rl)
 	}
 	return nil

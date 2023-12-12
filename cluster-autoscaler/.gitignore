@@ -12,3 +12,4 @@ cluster_autoscaler
 Session.vim
 .netrwhist
 .vscode
+vendor

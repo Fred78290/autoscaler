@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 )
 
 const serverProviderIdentifier = "multipass"
@@ -81,7 +82,7 @@ func (s *grpcServer) Name(ctx context.Context, request *CloudProviderServiceRequ
 	}
 
 	return &NameReply{
-		Name: ProviderName,
+		Name: cloudprovider.GrpcProviderName,
 	}, nil
 }
 
