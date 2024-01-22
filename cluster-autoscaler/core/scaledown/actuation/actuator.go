@@ -21,10 +21,7 @@ import (
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
-	"k8s.io/autoscaler/cluster-autoscaler/clusterstate"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/budgets"
@@ -33,6 +30,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/status"
 	"k8s.io/autoscaler/cluster-autoscaler/core/utils"
 	"k8s.io/autoscaler/cluster-autoscaler/metrics"
+	"k8s.io/autoscaler/cluster-autoscaler/observers/nodegroupchange"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
@@ -41,12 +39,12 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
+	"k8s.io/klog/v2"
 )
 
 // Actuator is responsible for draining and deleting nodes.
 type Actuator struct {
 	ctx                   *context.AutoscalingContext
-	clusterState          *clusterstate.ClusterStateRegistry
 	nodeDeletionTracker   *deletiontracker.NodeDeletionTracker
 	nodeDeletionScheduler *GroupDeletionScheduler
 	deleteOptions         options.NodeDeleteOptions
@@ -67,13 +65,19 @@ type actuatorNodeGroupConfigGetter interface {
 }
 
 // NewActuator returns a new instance of Actuator.
-func NewActuator(ctx *context.AutoscalingContext, csr *clusterstate.ClusterStateRegistry, ndt *deletiontracker.NodeDeletionTracker, deleteOptions options.NodeDeleteOptions, drainabilityRules rules.Rules, configGetter actuatorNodeGroupConfigGetter) *Actuator {
-	ndb := NewNodeDeletionBatcher(ctx, csr, ndt, ctx.NodeDeletionBatcherInterval)
+func NewActuator(ctx *context.AutoscalingContext, scaleStateNotifier nodegroupchange.NodeGroupChangeObserver, ndt *deletiontracker.NodeDeletionTracker, deleteOptions options.NodeDeleteOptions, drainabilityRules rules.Rules, configGetter actuatorNodeGroupConfigGetter) *Actuator {
+	ndb := NewNodeDeletionBatcher(ctx, scaleStateNotifier, ndt, ctx.NodeDeletionBatcherInterval)
+	legacyFlagDrainConfig := SingleRuleDrainConfig(ctx.MaxGracefulTerminationSec)
+	var evictor Evictor
+	if len(ctx.DrainPriorityConfig) > 0 {
+		evictor = NewEvictor(ndt, ctx.DrainPriorityConfig, true)
+	} else {
+		evictor = NewEvictor(ndt, legacyFlagDrainConfig, false)
+	}
 	return &Actuator{
 		ctx:                       ctx,
-		clusterState:              csr,
 		nodeDeletionTracker:       ndt,
-		nodeDeletionScheduler:     NewGroupDeletionScheduler(ctx, ndt, ndb, NewDefaultEvictor(deleteOptions, drainabilityRules, ndt)),
+		nodeDeletionScheduler:     NewGroupDeletionScheduler(ctx, ndt, ndb, evictor),
 		budgetProcessor:           budgets.NewScaleDownBudgetProcessor(ctx),
 		deleteOptions:             deleteOptions,
 		drainabilityRules:         drainabilityRules,
@@ -96,7 +100,7 @@ func (a *Actuator) ClearResultsNotNewerThan(t time.Time) {
 func (a *Actuator) StartDeletion(empty, drain []*apiv1.Node) (*status.ScaleDownStatus, errors.AutoscalerError) {
 	a.nodeDeletionScheduler.ReportMetrics()
 	deletionStartTime := time.Now()
-	defer func() { metrics.UpdateDuration(metrics.ScaleDownNodeDeletion, time.Now().Sub(deletionStartTime)) }()
+	defer func() { metrics.UpdateDuration(metrics.ScaleDownNodeDeletion, time.Since(deletionStartTime)) }()
 
 	results, ts := a.nodeDeletionTracker.DeletionResults()
 	scaleDownStatus := &status.ScaleDownStatus{NodeDeleteResults: results, NodeDeleteResultsAsOf: ts}
@@ -318,7 +322,7 @@ func (a *Actuator) scaleDownNodeToReport(node *apiv1.Node, drain bool) (*status.
 	}
 	var evictedPods []*apiv1.Pod
 	if drain {
-		_, nonDsPodsToEvict := podsToEvict(a.ctx, nodeInfo)
+		_, nonDsPodsToEvict := podsToEvict(nodeInfo, a.ctx.DaemonSetEvictionForOccupiedNodes)
 		evictedPods = nonDsPodsToEvict
 	}
 	return &status.ScaleDownNode{

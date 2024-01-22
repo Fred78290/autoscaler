@@ -19,6 +19,7 @@ package config
 import (
 	"time"
 
+	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -125,7 +126,12 @@ type AutoscalingOptions struct {
 	IgnoreMirrorPodsUtilization bool
 	// MaxGracefulTerminationSec is maximum number of seconds scale down waits for pods to terminate before
 	// removing the node from cloud provider.
+	// DrainPriorityConfig takes higher precedence and MaxGracefulTerminationSec will not be applicable when the DrainPriorityConfig is set.
 	MaxGracefulTerminationSec int
+	// DrainPriorityConfig is a list of ShutdownGracePeriodByPodPriority.
+	// This field is optional and could be nil.
+	// DrainPriorityConfig takes higher precedence and MaxGracefulTerminationSec will not be applicable when the DrainPriorityConfig is set.
+	DrainPriorityConfig []kubelet_config.ShutdownGracePeriodByPodPriority
 	// MaxTotalUnreadyPercentage is the maximum percentage of unready nodes after which CA halts operations
 	MaxTotalUnreadyPercentage float64
 	// OkTotalUnreadyCount is the number of allowed unready nodes, irrespective of max-total-unready-percentage
@@ -152,6 +158,9 @@ type AutoscalingOptions struct {
 	ScaleDownDelayAfterDelete time.Duration
 	// ScaleDownDelayAfterFailure sets the duration before the next scale down attempt if scale down results in an error
 	ScaleDownDelayAfterFailure time.Duration
+	// ScaleDownDelayTypeLocal sets if the --scale-down-delay-after-* flags should be applied locally per nodegroup
+	// or globally across all nodegroups
+	ScaleDownDelayTypeLocal bool
 	// ScaleDownNonEmptyCandidatesCount is the maximum number of non empty nodes
 	// considered at once as candidates for scale down.
 	ScaleDownNonEmptyCandidatesCount int
@@ -275,6 +284,8 @@ type AutoscalingOptions struct {
 	DynamicNodeDeleteDelayAfterTaintEnabled bool
 	// BypassedSchedulers are used to specify which schedulers to bypass their processing
 	BypassedSchedulers map[string]bool
+	// ProvisioningRequestEnabled tells if CA processes ProvisioningRequest.
+	ProvisioningRequestEnabled bool
 }
 
 // KubeClientOptions specify options for kube client
@@ -285,4 +296,8 @@ type KubeClientOptions struct {
 	KubeConfigPath string
 	// APIContentType specifies type of requests sent to APIServer.
 	APIContentType string
+	// Burst setting for kubernetes client
+	KubeClientBurst int
+	// QPS setting for kubernetes client
+	KubeClientQPS float32
 }

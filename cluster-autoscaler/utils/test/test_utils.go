@@ -89,13 +89,18 @@ func AddSchedulerName(schedulerName string) func(*apiv1.Pod) {
 	}
 }
 
-// BuildDSTestPod creates a DaemonSet pod with cpu and memory.
-func BuildDSTestPod(name string, cpu int64, mem int64) *apiv1.Pod {
+// WithDSController creates a daemonSet owner ref for the pod.
+func WithDSController() func(*apiv1.Pod) {
+	return func(pod *apiv1.Pod) {
+		pod.OwnerReferences = GenerateOwnerReferences("ds", "DaemonSet", "apps/v1", "some-uid")
+	}
+}
 
-	pod := BuildTestPod(name, cpu, mem)
-	pod.OwnerReferences = GenerateOwnerReferences("ds", "DaemonSet", "apps/v1", "some-uid")
-
-	return pod
+// WithNodeName sets a node name to the pod.
+func WithNodeName(nodeName string) func(*apiv1.Pod) {
+	return func(pod *apiv1.Pod) {
+		pod.Spec.NodeName = nodeName
+	}
 }
 
 // BuildTestPodWithEphemeralStorage creates a pod with cpu, memory and ephemeral storage resources.
@@ -426,8 +431,14 @@ func NewHttpServerMock(fields ...HttpServerMockField) *HttpServerMock {
 
 func (l *HttpServerMock) handle(req *http.Request, w http.ResponseWriter, serverMock *HttpServerMock) string {
 	url := req.URL.Path
+	query := req.URL.Query()
 	var response string
-	args := l.Called(url)
+	var args mock.Arguments
+	if query.Has("pageToken") {
+		args = l.Called(url, query.Get("pageToken"))
+	} else {
+		args = l.Called(url)
+	}
 	for i, field := range l.fields {
 		switch field {
 		case MockFieldResponse:

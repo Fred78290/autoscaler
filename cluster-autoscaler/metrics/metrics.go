@@ -44,6 +44,9 @@ type FunctionLabel string
 // NodeGroupType describes node group relation to CA
 type NodeGroupType string
 
+// PodEvictionResult describes result of the pod eviction attempt
+type PodEvictionResult string
+
 const (
 	caNamespace           = "cluster_autoscaler"
 	readyLabel            = "ready"
@@ -87,6 +90,10 @@ const (
 	// This is meant to help find unexpectedly long function execution times for
 	// debugging purposes.
 	LogLongDurationThreshold = 5 * time.Second
+	// PodEvictionSucceed means creation of the pod eviction object succeed
+	PodEvictionSucceed PodEvictionResult = "succeeded"
+	// PodEvictionFailed means creation of the pod eviction object failed
+	PodEvictionFailed PodEvictionResult = "failed"
 )
 
 // Names of Cluster Autoscaler operations
@@ -222,7 +229,7 @@ var (
 			Namespace: caNamespace,
 			Name:      "function_duration_seconds",
 			Help:      "Time taken by various parts of CA main loop.",
-			Buckets:   []float64{0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 27.5, 30.0, 50.0, 75.0, 100.0, 1000.0},
+			Buckets:   k8smetrics.ExponentialBuckets(0.01, 1.5, 30), // 0.01, 0.015, 0.0225, ..., 852.2269299239293, 1278.3403948858938
 		}, []string{"function"},
 	)
 
@@ -300,12 +307,12 @@ var (
 		}, []string{"reason", "gpu_resource_name", "gpu_name"},
 	)
 
-	evictionsCount = k8smetrics.NewCounter(
+	evictionsCount = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Namespace: caNamespace,
 			Name:      "evicted_pods_total",
 			Help:      "Number of pods evicted by CA",
-		},
+		}, []string{"eviction_result"},
 	)
 
 	unneededNodesCount = k8smetrics.NewGauge(
@@ -566,9 +573,9 @@ func RegisterScaleDown(nodesCount int, gpuResourceName, gpuType string, reason N
 	}
 }
 
-// RegisterEvictions records number of evicted pods
-func RegisterEvictions(podsCount int) {
-	evictionsCount.Add(float64(podsCount))
+// RegisterEvictions records number of evicted pods succeed or failed
+func RegisterEvictions(podsCount int, result PodEvictionResult) {
+	evictionsCount.WithLabelValues(string(result)).Add(float64(podsCount))
 }
 
 // UpdateUnneededNodesCount records number of currently unneeded nodes
