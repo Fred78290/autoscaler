@@ -175,9 +175,9 @@ type Detail string
 // The following constants list all currently available Conditions Type values.
 // See: https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition
 const (
-	// CapacityAvailable indicates that all of the requested resources were
-	// already available in the cluster.
-	CapacityAvailable string = "CapacityAvailable"
+	// BookingExpired indicates that the ProvisioningRequest had Provisioned condition before
+	// and capacity reservation time is expired.
+	BookingExpired string = "BookingExpired"
 	// Provisioned indicates that all of the requested resources were created
 	// and are available in the cluster. CA will set this condition when the
 	// VM creation finishes successfully.
