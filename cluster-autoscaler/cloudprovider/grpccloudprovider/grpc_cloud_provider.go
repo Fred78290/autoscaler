@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -391,7 +390,7 @@ func (grpc *grpcCloudProvider) GPULabel() string {
 
 // GetNodeGpuConfig returns the label, type and resource name for the GPU added to node. If node doesn't have
 // any GPUs, it returns nil.
-func (grpc *grpcCloudProvider) GetNodeGpuConfig(node *apiv1.Node) *cloudprovider.GpuConfig {
+func (grpc *grpcCloudProvider) GetNodeGpuConfig(node *v1.Node) *cloudprovider.GpuConfig {
 	return gpu.GetNodeGPUFromCloudProvider(grpc, node)
 }
 

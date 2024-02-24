@@ -493,6 +493,9 @@ func (ng *GrpcNodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions)
 				ScaleDownUnreadyTime: &metav1.Duration{
 					Duration: defaults.ScaleDownUnreadyTime,
 				},
+				MaxNodeProvisionTime: &metav1.Duration{
+					Duration: defaults.MaxNodeProvisionTime,
+				},
 			},
 		}
 
@@ -519,6 +522,9 @@ func (ng *GrpcNodeGroup) GetOptions(defaults config.NodeGroupAutoscalingOptions)
 			ScaleDownGpuUtilizationThreshold: pbOpts.GetScaleDownGpuUtilizationThreshold(),
 			ScaleDownUnneededTime:            pbOpts.GetScaleDownUnneededTime().Duration,
 			ScaleDownUnreadyTime:             pbOpts.GetScaleDownUnreadyTime().Duration,
+			MaxNodeProvisionTime:             pbOpts.GetMaxNodeProvisionTime().Duration,
+			ZeroOrMaxNodeScaling:             defaults.ZeroOrMaxNodeScaling,
+			IgnoreDaemonSetsUtilization:      defaults.IgnoreDaemonSetsUtilization,
 		}
 
 		return opts, nil

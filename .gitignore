@@ -31,3 +31,5 @@ Session.vim
 
 # Binary files
 bin/
+
+cluster-autoscaler/.config/
