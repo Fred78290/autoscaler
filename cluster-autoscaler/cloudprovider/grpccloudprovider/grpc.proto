@@ -439,6 +439,15 @@ message AutoscalingOptions {
     // ScaleDownUnreadyTime represents how long an unready node should be
     // unneeded before it is eligible for scale down.
     k8s.io.apimachinery.pkg.apis.meta.v1.Duration scaleDownUnreadyTime = 4;
+
+    // MaxNodeProvisionTime time CA waits for node to be provisioned
+    k8s.io.apimachinery.pkg.apis.meta.v1.Duration maxNodeProvisionTime = 5;
+
+	// ZeroOrMaxNodeScaling means that a node group should be scaled up to maximum size or down to zero nodes all at once instead of one-by-one.
+	bool zeroOrMaxNodeScaling = 6;
+	
+    // IgnoreDaemonSetsUtilization sets if daemonsets utilization should be considered during node scale-down
+	bool ignoreDaemonSetsUtilization = 7;
 }
 
 message GetOptionsRequest {

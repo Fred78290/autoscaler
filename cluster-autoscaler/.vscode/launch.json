@@ -1,0 +1,65 @@
+{
+	// Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
+	// Pointez pour afficher la description des attributs existants.
+	// Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+            "preLaunchTask": "k3s vsphere",
+			"name": "vsphere external GRPC",
+			"type": "go",
+			"request": "launch",
+			"mode": "auto",
+			"program": "${workspaceFolder}",
+			"args": [
+				"--v=4",
+				"--stderrthreshold=info",
+				"--cloud-provider=externalgrpc",
+				"--cloud-config=${workspaceFolder}/.config/vsphere/vsphere-test-k3s/grpc-config.yaml",
+				"--kubeconfig=${workspaceFolder}/.config/vsphere/vsphere-test-k3s/config",
+				"--nodes=0:9:true/vsphere-test-k3s",
+				"--max-nodes-total=9",
+				"--cores-total=0:36",
+				"--memory-total=0:48",
+				"--node-autoprovisioning-enabled",
+				"--max-autoprovisioned-node-group-count=1",
+				"--scale-down-enabled=true",
+				"--scale-down-delay-after-add=1m",
+				"--scale-down-delay-after-delete=1m",
+				"--scale-down-delay-after-failure=1m",
+				"--scale-down-unneeded-time=1m",
+				"--scale-down-unready-time=1m",
+				"--unremovable-node-recheck-timeout=1m",
+				"--node-deletion-delay-timeout=30s"
+			]
+		},
+		{
+            "preLaunchTask": "k3s vsphere",
+			"type": "go",
+			"request": "launch",
+			"mode": "auto",
+			"program": "${workspaceFolder}",
+			"args": [
+				"--v=4",
+				"--stderrthreshold=info",
+				"--cloud-provider=grpc",
+				"--cloud-config=${workspaceFolder}/.config/vsphere/vsphere-test-k3s/grpc-config.json",
+				"--kubeconfig=${workspaceFolder}/.config/vsphere/vsphere-test-k3s/config",
+				"--nodes=0:9:true/vsphere-test-k3s",
+				"--max-nodes-total=9",
+				"--cores-total=0:36",
+				"--memory-total=0:48",
+				"--node-autoprovisioning-enabled",
+				"--max-autoprovisioned-node-group-count=1",
+				"--scale-down-enabled=true",
+				"--scale-down-delay-after-add=1m",
+				"--scale-down-delay-after-delete=1m",
+				"--scale-down-delay-after-failure=1m",
+				"--scale-down-unneeded-time=1m",
+				"--scale-down-unready-time=1m",
+				"--unremovable-node-recheck-timeout=1m",
+				"--node-deletion-delay-timeout=30s"
+			]
+		}
+	]
+}

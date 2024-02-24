@@ -37,3 +37,5 @@ cluster-autoscaler/out/
 cluster-autoscaler/aws.sh
 
 cluster-autoscaler/vsphere.sh
+
+cluster-autoscaler/.config/
