@@ -36,7 +36,10 @@ IMAGE=$(REGISTRY)/cluster-autoscaler$(PROVIDER)
 
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
-build: build-arch-$(GOARCH)
+build:
+	@echo "⚠️  WARNING: The vendor directory will be removed soon. \
+	Please make sure your dependencies are managed via Go modules."
+	@$(MAKE) build-arch-$(GOARCH)
 
 build-arch-%: clean-arch-%
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -o cluster-autoscaler-$* ${LDFLAGS_FLAG} ${TAGS_FLAG}
@@ -106,7 +109,7 @@ container-arch-%: build-in-docker-arch-% make-image-arch-%
 	@echo "Full in-docker image ${TAG}${FOR_PROVIDER}-$* completed"
 
 test-in-docker: clean docker-builder
-	docker run ${RM_FLAG} -v `pwd`:/cluster-autoscaler/:Z autoscaling-builder:latest bash -c 'cd /cluster-autoscaler && go test -race ./... ${TAGS_FLAG}'
+	docker run ${RM_FLAG} -v `pwd`:/cluster-autoscaler/:Z autoscaling-builder:latest bash -c 'cd /cluster-autoscaler && go mod vendor && go test -race ./... ${TAGS_FLAG}'
 
 .PHONY: all build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate push-image push-manifest
 
@@ -119,7 +122,7 @@ $(LOCALBIN):
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 
 ## Tool Versions
-CONTROLLER_TOOLS_VERSION ?= v0.13.0
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -128,4 +131,4 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 
 .PHONY: manifest
 manifest: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./apis/..." output:crd:artifacts:config=apis/config/crd
