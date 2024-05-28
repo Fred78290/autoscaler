@@ -27,6 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
+	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/besteffortatomic"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/checkcapacity"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/conditions"
 	provreq_pods "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
@@ -64,7 +65,13 @@ func New(kubeConfig *rest.Config) (*provReqOrchestrator, error) {
 		return nil, err
 	}
 
-	return &provReqOrchestrator{client: client, provisioningClasses: []provisioningClass{checkcapacity.New(client)}}, nil
+	return &provReqOrchestrator{
+		client: client,
+		provisioningClasses: []provisioningClass{
+			checkcapacity.New(client),
+			besteffortatomic.New(client),
+		},
+	}, nil
 }
 
 // Initialize initialize orchestrator.
@@ -91,6 +98,7 @@ func (o *provReqOrchestrator) ScaleUp(
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
+	_ bool, // Provision() doesn't use this parameter.
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
 		return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, fmt.Errorf("provisioningrequest.Orchestrator is not initialized"))
@@ -132,6 +140,9 @@ func (o *provReqOrchestrator) bookCapacity() error {
 				// If there is an error, mark PR as invalid, because we won't be able to book capacity
 				// for it anyway.
 				conditions.AddOrUpdateCondition(provReq, v1beta1.Failed, metav1.ConditionTrue, conditions.FailedToBookCapacityReason, fmt.Sprintf("Couldn't create pods, err: %v", err), metav1.Now())
+				if _, err := o.client.UpdateProvisioningRequest(provReq.ProvisioningRequest); err != nil {
+					klog.Errorf("failed to add Accepted condition to ProvReq %s/%s, err: %v", provReq.Namespace, provReq.Name, err)
+				}
 				continue
 			}
 			podsToCreate = append(podsToCreate, pods...)
