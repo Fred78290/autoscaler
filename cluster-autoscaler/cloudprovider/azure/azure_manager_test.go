@@ -29,8 +29,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	azclients "sigs.k8s.io/cloud-provider-azure/pkg/azureclients"
@@ -136,7 +136,10 @@ const validAzureCfgForStandardVMTypeWithoutDeploymentParameters = `{
         "deployment":"cluster-autoscaler-0001"
 }`
 
-const invalidAzureCfg = `{{}"cloud": "AzurePublicCloud",}`
+const (
+	invalidAzureCfg = `{{}"cloud": "AzurePublicCloud",}`
+	testASG         = "test-asg"
+)
 
 func TestCreateAzureManagerValidConfig(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -352,6 +355,9 @@ func TestCreateAzureManagerWithNilConfig(t *testing.T) {
 		TenantID:                     "tenantId",
 		SubscriptionID:               "subscriptionId",
 		ResourceGroup:                "resourceGroup",
+		ClusterName:                  "mycluster",
+		ClusterResourceGroup:         "myrg",
+		ARMBaseURLForAPClient:        "nodeprovisioner-svc.nodeprovisioner.svc.cluster.local",
 		VMType:                       "vmss",
 		AADClientID:                  "aadClientId",
 		AADClientSecret:              "aadClientSecret",
@@ -449,6 +455,9 @@ func TestCreateAzureManagerWithNilConfig(t *testing.T) {
 	t.Setenv("BACKOFF_DURATION", "1")
 	t.Setenv("BACKOFF_JITTER", "1")
 	t.Setenv("CLOUD_PROVIDER_RATE_LIMIT", "true")
+	t.Setenv("CLUSTER_NAME", "mycluster")
+	t.Setenv("ARM_CLUSTER_RESOURCE_GROUP", "myrg")
+	t.Setenv("ARM_BASE_URL_FOR_AP_CLIENT", "nodeprovisioner-svc.nodeprovisioner.svc.cluster.local")
 
 	t.Run("environment variables correctly set", func(t *testing.T) {
 		manager, err := createAzureManagerInternal(nil, cloudprovider.NodeGroupDiscoveryOptions{}, mockAzClient)
